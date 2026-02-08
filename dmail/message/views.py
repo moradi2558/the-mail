@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.exceptions import ValidationError
 from django.db import models
-from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer
+from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer, BlockUserSerializer
 from .services import MessageService
 
 
@@ -229,3 +229,112 @@ class ContactListView(APIView):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ToggleStarView(APIView):
+    """
+    API View for toggling star status of a message
+    POST /api/message/<id>/toggle-star/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, message_id):
+        """
+        Toggle star status of a message
+        Requires: Bearer Token
+        User must be sender or receiver of the message
+        """
+        try:
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            MessageService.toggle_star(message, request.user)
+            
+            serializer = MessageDetailSerializer(message, context={'request': request})
+            
+            return Response({
+                'message': 'وضعیت ستاره پیام تغییر کرد',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except ValidationError as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BlockUserView(APIView):
+    """
+    API View for blocking a user
+    POST /api/message/block/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Block a user (prevent them from sending messages)
+        Body: {email, is_spam}
+        """
+        serializer = BlockUserSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+                block = MessageService.block_user(
+                    blocker=request.user,
+                    blocked_email=serializer.validated_data['email'],
+                    is_spam=serializer.validated_data.get('is_spam', False)
+                )
+                
+                return Response({
+                    'message': 'کاربر با موفقیت بلاک شد',
+                    'data': {
+                        'blocked_email': serializer.validated_data['email'],
+                        'is_spam': block.is_spam
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            except ValidationError as e:
+                return Response({
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UnblockUserView(APIView):
+    """
+    API View for unblocking a user
+    POST /api/message/unblock/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Unblock a user
+        Body: {email}
+        """
+        serializer = BlockUserSerializer(data=request.data)
+        
+        if serializer.is_valid():
+            try:
+                MessageService.unblock_user(
+                    blocker=request.user,
+                    blocked_email=serializer.validated_data['email']
+                )
+                
+                return Response({
+                    'message': 'کاربر با موفقیت آنبلاک شد'
+                }, status=status.HTTP_200_OK)
+            
+            except ValidationError as e:
+                return Response({
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

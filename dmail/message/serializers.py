@@ -90,7 +90,6 @@ class ContactSerializer(serializers.Serializer):
         if not user:
             return None
         
-        # Get last message between user and contact
         last_message = Message.objects.filter(
             models.Q(sender=user, receiver=obj) | models.Q(sender=obj, receiver=user)
         ).exclude(status='deleted').order_by('-created_at').first()
@@ -308,3 +307,9 @@ class MessageDetailSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.receiver.profile.profile_image.url)
         return None
+
+
+class BlockUserSerializer(serializers.Serializer):
+    """Serializer for blocking/unblocking a user"""
+    email = serializers.EmailField(required=True, label='ایمیل کاربر')
+    is_spam = serializers.BooleanField(default=False, required=False, label='اسپم')

@@ -2,7 +2,7 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.db import models
-from .models import Message
+from .models import Message, Block
 
 User = get_user_model()
 
@@ -36,6 +36,10 @@ class MessageService:
                 receiver = User.objects.get(email=receiver_email)
             except User.DoesNotExist:
                 raise ValidationError('گیرنده با این ایمیل یافت نشد')
+            
+            # Check if sender is blocked by receiver
+            if MessageService.is_blocked(blocker=receiver, blocked=sender):
+                raise ValidationError('شما توسط این کاربر بلاک شده‌اید و نمی‌توانید پیام ارسال کنید')
         
         # Create message
         message = Message.objects.create(

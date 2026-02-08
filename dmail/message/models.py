@@ -75,3 +75,22 @@ class Message(models.Model):
             except:
                 return 0
         return 0
+
+
+class Block(models.Model):
+    """Model for blocking users"""
+    blocker = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='blocked_users', verbose_name='بلاک کننده')
+    blocked = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='blocked_by_users', verbose_name='بلاک شده')
+    is_spam = models.BooleanField(default=False, verbose_name='اسپم')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='زمان ایجاد')
+    
+    class Meta:
+        unique_together = ('blocker', 'blocked')
+        verbose_name = 'بلاک'
+        verbose_name_plural = 'بلاک‌ها'
+        indexes = [
+            models.Index(fields=['blocker', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.blocker.username} blocked {self.blocked.username}"
