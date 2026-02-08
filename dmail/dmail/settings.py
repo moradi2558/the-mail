@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'rest_framework_simplejwt',
-    'users',
+    'acoount',
 ]
 
 MIDDLEWARE = [
@@ -127,7 +127,7 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Custom User Model
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = 'acoount.User'
 
 # REST Framework Settings
 REST_FRAMEWORK = {
@@ -167,7 +167,6 @@ JAZZMIN_SETTINGS = {
     "site_icon": None,
     "welcome_sign": "به پنل مدیریت D-Mail خوش آمدید",
     "copyright": "D-Mail",
-    "search_model": ["users.User"],
     "user_avatar": None,
     "topmenu_links": [
         {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
@@ -179,20 +178,11 @@ JAZZMIN_SETTINGS = {
     "navigation_expanded": True,
     "hide_apps": [],
     "hide_models": [],
-    "order_with_respect_to": ["auth", "users"],
-    "custom_links": {
-        "users": [{
-            "name": "Make Messages",
-            "url": "make_messages",
-            "icon": "fas fa-comments",
-            "permissions": ["users.view_user"]
-        }]
-    },
+    "order_with_respect_to": ["auth"],
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
-        "users.User": "fas fa-user",
     },
     "default_icon_parents": "fas fa-chevron-circle-right",
     "default_icon_children": "fas fa-circle",
@@ -202,7 +192,6 @@ JAZZMIN_SETTINGS = {
     "use_google_fonts_cdn": True,
     "show_ui_builder": False,
     "changeform_format": "horizontal_tabs",
-    "changeform_format_overrides": {"users.user": "collapsible"},
 }
 
 JAZZMIN_UI_TWEAKS = {
