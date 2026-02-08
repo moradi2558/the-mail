@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
+from .models import User, Profile
 
 
 class UserRegistrationSerializer(serializers.ModelSerializer):
@@ -108,3 +108,67 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email', 'is_active', 'is_admin')
         read_only_fields = ('id', 'username', 'is_active', 'is_admin')
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    """Serializer for user profile details"""
+    profile_image_url = serializers.SerializerMethodField()
+    theme_image_url = serializers.SerializerMethodField()
+    full_name = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Profile
+        fields = (
+            'id',
+            'name',
+            'full_name',
+            'profile_image',
+            'profile_image_url',
+            'theme_image',
+            'theme_image_url',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('id', 'created_at', 'updated_at')
+    
+    def get_profile_image_url(self, obj):
+        """Get profile image URL"""
+        if obj.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_image.url)
+        return None
+    
+    def get_theme_image_url(self, obj):
+        """Get theme image URL"""
+        if obj.theme_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.theme_image.url)
+        return None
+    
+    def get_full_name(self, obj):
+        """Get user's full name"""
+        return obj.get_full_name()
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    """Serializer for changing password"""
+    old_password = serializers.CharField(write_only=True, required=True, style={'input_type': 'password'}, label='رمز عبور فعلی')
+    new_password = serializers.CharField(write_only=True, required=True, min_length=8, style={'input_type': 'password'}, label='رمز عبور جدید')
+    new_password_confirm = serializers.CharField(write_only=True, required=True, min_length=8, style={'input_type': 'password'}, label='تکرار رمز عبور جدید')
+    
+    def validate(self, attrs):
+        """Validate password change data"""
+        if attrs['new_password'] != attrs['new_password_confirm']:
+            raise serializers.ValidationError({
+                'new_password_confirm': 'رمزهای عبور جدید مطابقت ندارند'
+            })
+        return attrs
+    
+    def validate_old_password(self, value):
+        """Validate old password"""
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError('رمز عبور فعلی اشتباه است')
+        return value

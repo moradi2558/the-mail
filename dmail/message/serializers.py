@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Message
 from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.db import models
 import os
 
 
@@ -35,7 +36,6 @@ class MessageCreateSerializer(serializers.ModelSerializer):
     def validate_attachment(self, value):
         """Validate attachment file size (max 10MB)"""
         if value:
-            # Check file size (10MB = 10 * 1024 * 1024 bytes)
             max_size = 10 * 1024 * 1024
             if value.size > max_size:
                 raise serializers.ValidationError(
@@ -61,12 +61,61 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         return attrs
 
 
+class ContactSerializer(serializers.Serializer):
+    """Serializer for contact list"""
+    id = serializers.IntegerField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    
+    def get_name(self, obj):
+        """Get contact's name"""
+        if hasattr(obj, 'profile'):
+            return obj.profile.get_full_name()
+        return obj.username
+    
+    def get_profile_image(self, obj):
+        """Get contact's profile image URL"""
+        if hasattr(obj, 'profile') and obj.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile.profile_image.url)
+        return None
+    
+    def get_last_message(self, obj):
+        """Get last message with this contact"""
+        user = self.context.get('user')
+        if not user:
+            return None
+        
+        # Get last message between user and contact
+        last_message = Message.objects.filter(
+            models.Q(sender=user, receiver=obj) | models.Q(sender=obj, receiver=user)
+        ).exclude(status='deleted').order_by('-created_at').first()
+        
+        if last_message:
+            return {
+                'id': last_message.id,
+                'subject': last_message.subject,
+                'body': last_message.body[:100] if last_message.body else None,
+                'created_at': last_message.created_at,
+                'is_sent_by_me': last_message.sender == user,
+            }
+        return None
+
+
 class MessageListSerializer(serializers.ModelSerializer):
     """Serializer for listing messages"""
     sender_email = serializers.EmailField(source='sender.email', read_only=True)
     sender_username = serializers.CharField(source='sender.username', read_only=True)
+    sender_name = serializers.SerializerMethodField()
+    sender_profile_image = serializers.SerializerMethodField()
     receiver_email = serializers.EmailField(source='receiver.email', read_only=True, allow_null=True)
     receiver_username = serializers.CharField(source='receiver.username', read_only=True, allow_null=True)
+    receiver_name = serializers.SerializerMethodField()
+    receiver_profile_image = serializers.SerializerMethodField()
     attachment_size = serializers.SerializerMethodField()
     attachment_name = serializers.SerializerMethodField()
     has_attachment = serializers.SerializerMethodField()
@@ -80,8 +129,12 @@ class MessageListSerializer(serializers.ModelSerializer):
             'body',
             'sender_email',
             'sender_username',
+            'sender_name',
+            'sender_profile_image',
             'receiver_email',
             'receiver_username',
+            'receiver_name',
+            'receiver_profile_image',
             'is_private',
             'status',
             'created_at',
@@ -96,6 +149,7 @@ class MessageListSerializer(serializers.ModelSerializer):
             'attachment_size',
             'attachment_name',
             'public_link',
+            'public_link_url',
         )
         read_only_fields = fields
     
@@ -119,14 +173,46 @@ class MessageListSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(f'/api/message/public/{obj.public_link}/')
         return None
+    
+    def get_sender_name(self, obj):
+        """Get sender's name"""
+        if hasattr(obj.sender, 'profile'):
+            return obj.sender.profile.get_full_name()
+        return obj.sender.username
+    
+    def get_sender_profile_image(self, obj):
+        """Get sender's profile image URL"""
+        if hasattr(obj.sender, 'profile') and obj.sender.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.sender.profile.profile_image.url)
+        return None
+    
+    def get_receiver_name(self, obj):
+        """Get receiver's name"""
+        if obj.receiver and hasattr(obj.receiver, 'profile'):
+            return obj.receiver.profile.get_full_name()
+        return obj.receiver.username if obj.receiver else None
+    
+    def get_receiver_profile_image(self, obj):
+        """Get receiver's profile image URL"""
+        if obj.receiver and hasattr(obj.receiver, 'profile') and obj.receiver.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.receiver.profile.profile_image.url)
+        return None
 
 
 class MessageDetailSerializer(serializers.ModelSerializer):
     """Serializer for detailed message view"""
     sender_email = serializers.EmailField(source='sender.email', read_only=True)
     sender_username = serializers.CharField(source='sender.username', read_only=True)
+    sender_name = serializers.SerializerMethodField()
+    sender_profile_image = serializers.SerializerMethodField()
     receiver_email = serializers.EmailField(source='receiver.email', read_only=True, allow_null=True)
     receiver_username = serializers.CharField(source='receiver.username', read_only=True, allow_null=True)
+    receiver_name = serializers.SerializerMethodField()
+    receiver_profile_image = serializers.SerializerMethodField()
     attachment_size = serializers.SerializerMethodField()
     attachment_name = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
@@ -141,8 +227,12 @@ class MessageDetailSerializer(serializers.ModelSerializer):
             'body',
             'sender_email',
             'sender_username',
+            'sender_name',
+            'sender_profile_image',
             'receiver_email',
             'receiver_username',
+            'receiver_name',
+            'receiver_profile_image',
             'is_private',
             'status',
             'created_at',
@@ -190,4 +280,31 @@ class MessageDetailSerializer(serializers.ModelSerializer):
         if request:
             return request.build_absolute_uri(f'/api/message/public/{obj.public_link}/')
         return None
-
+    
+    def get_sender_name(self, obj):
+        """Get sender's name"""
+        if hasattr(obj.sender, 'profile'):
+            return obj.sender.profile.get_full_name()
+        return obj.sender.username
+    
+    def get_sender_profile_image(self, obj):
+        """Get sender's profile image URL"""
+        if hasattr(obj.sender, 'profile') and obj.sender.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.sender.profile.profile_image.url)
+        return None
+    
+    def get_receiver_name(self, obj):
+        """Get receiver's name"""
+        if obj.receiver and hasattr(obj.receiver, 'profile'):
+            return obj.receiver.profile.get_full_name()
+        return obj.receiver.username if obj.receiver else None
+    
+    def get_receiver_profile_image(self, obj):
+        """Get receiver's profile image URL"""
+        if obj.receiver and hasattr(obj.receiver, 'profile') and obj.receiver.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.receiver.profile.profile_image.url)
+        return None

@@ -35,3 +35,36 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_staff(self):
         """Check if user is staff (admin)"""
         return self.is_admin
+
+
+def profile_image_upload_path(instance, filename):
+    """Generate upload path for profile images"""
+    return f'profiles/{instance.user.id}/profile_{filename}'
+
+
+def theme_image_upload_path(instance, filename):
+    """Generate upload path for theme images"""
+    return f'profiles/{instance.user.id}/theme_{filename}'
+
+
+class Profile(models.Model):
+    """User Profile model"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', verbose_name='کاربر')
+    name = models.CharField(max_length=100, null=True, blank=True, verbose_name='نام')
+    profile_image = models.ImageField(upload_to=profile_image_upload_path, null=True, blank=True, verbose_name='عکس پروفایل')
+    theme_image = models.ImageField(upload_to=theme_image_upload_path, null=True, blank=True, verbose_name='عکس تم')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='زمان ایجاد')
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='زمان به‌روزرسانی')
+    
+    class Meta:
+        verbose_name = 'پروفایل'
+        verbose_name_plural = 'پروفایل‌ها'
+    
+    def __str__(self):
+        return f"{self.user.username} - Profile"
+    
+    def get_full_name(self):
+        """Get user's full name"""
+        if self.name:
+            return self.name
+        return self.user.username

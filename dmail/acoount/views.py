@@ -2,15 +2,21 @@ from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import UntypedToken
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from .serializers import (
     UserRegistrationSerializer,
     UserLoginSerializer,
-    UserProfileSerializer
+    UserProfileSerializer,
+    ProfileSerializer,
+    ChangePasswordSerializer
 )
 from .tokens import CustomRefreshToken
+from .models import Profile
+from .services import AccountService
 
 User = get_user_model()
 
@@ -131,3 +137,83 @@ class ProfileView(APIView):
                 'token_payload': token_data
             }
         }, status=status.HTTP_200_OK)
+
+
+class ProfileDetailView(APIView):
+    """
+    API View for user profile details
+    GET /api/account/profile/detail/
+    PUT/PATCH /api/account/profile/detail/
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def get(self, request):
+        """
+        Get user profile details
+        Requires: Bearer Token
+        """
+        profile = AccountService.get_or_create_profile(request.user)
+        serializer = ProfileSerializer(profile, context={'request': request})
+        
+        return Response({
+            'message': 'پروفایل با موفقیت دریافت شد',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    def put(self, request):
+        """
+        Update user profile
+        Body: {name, profile_image, theme_image}
+        """
+        profile = AccountService.update_profile(
+            user=request.user,
+            name=request.data.get('name'),
+            profile_image=request.FILES.get('profile_image'),
+            theme_image=request.FILES.get('theme_image')
+        )
+        
+        serializer = ProfileSerializer(profile, context={'request': request})
+        
+        return Response({
+            'message': 'پروفایل با موفقیت به‌روزرسانی شد',
+            'data': serializer.data
+        }, status=status.HTTP_200_OK)
+    
+    def patch(self, request):
+        """Partial update user profile"""
+        return self.put(request)
+
+
+class ChangePasswordView(APIView):
+    """
+    API View for changing password
+    POST /api/account/change-password/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Change user password
+        Body: {old_password, new_password, new_password_confirm}
+        """
+        serializer = ChangePasswordSerializer(data=request.data, context={'request': request})
+        
+        if serializer.is_valid():
+            try:
+                AccountService.change_password(
+                    user=request.user,
+                    old_password=serializer.validated_data['old_password'],
+                    new_password=serializer.validated_data['new_password']
+                )
+                
+                return Response({
+                    'message': 'رمز عبور با موفقیت تغییر کرد'
+                }, status=status.HTTP_200_OK)
+            
+            except ValidationError as e:
+                return Response({
+                    'error': str(e)
+                }, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

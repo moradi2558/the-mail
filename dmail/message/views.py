@@ -4,7 +4,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.exceptions import ValidationError
-from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer
+from django.db import models
+from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer
 from .services import MessageService
 
 
@@ -157,6 +158,73 @@ class MessagePublicView(APIView):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarkAsReadView(APIView):
+    """
+    API View for marking a message as read
+    POST /api/message/<id>/mark-read/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, message_id):
+        """
+        Mark message as read
+        Requires: Bearer Token
+        User must be receiver of the message
+        """
+        try:
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            MessageService.mark_as_read(message, request.user)
+            
+            serializer = MessageDetailSerializer(message, context={'request': request})
+            
+            return Response({
+                'message': 'پیام به عنوان خوانده شده علامت زده شد',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except ValidationError as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ContactListView(APIView):
+    """
+    API View for listing user contacts
+    GET /api/message/contacts/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get all contacts for authenticated user
+        Contacts are users who have sent or received messages from the user
+        """
+        try:
+            contacts = MessageService.get_user_contacts(user=request.user)
+            
+            serializer = ContactSerializer(contacts, many=True, context={'request': request, 'user': request.user})
+            
+            return Response({
+                'message': 'لیست کانتکت‌ها با موفقیت دریافت شد',
+                'count': contacts.count(),
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
         except Exception as e:
             return Response({
                 'error': str(e)
