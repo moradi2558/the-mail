@@ -1,0 +1,201 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mail - صندوق ورودی</title>
+    <link rel="stylesheet" href="{% static 'css/inbox.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-container">
+        <div class="forest-background"></div>
+    </div>
+
+    <div class="inbox-container">
+        <header class="inbox-header">
+            <div class="header-left">
+                <h1 class="logo">D-Mail</h1>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="جستجو در ایمیل‌ها...">
+                    <span class="search-icon">🔍</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="compose-btn" id="composeBtn">
+                    <span>✏️</span>
+                    <span>نوشتن</span>
+                </button>
+                <div class="user-menu">
+                    <a href="/home/" class="user-btn" id="profileBtn" onclick="showLoading('در حال انتقال');">
+                        <span class="user-avatar">👤</span>
+                    </a>
+                    <button class="user-btn logout-btn" id="logoutBtn" onclick="logout()" title="خروج">
+                        <span style="font-size: 18px;">⏻</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="inbox-content">
+            <aside class="sidebar">
+                <nav class="sidebar-nav">
+                    <a href="/inbox/" class="nav-item active" data-type="inbox">
+                        <span class="nav-icon">📥</span>
+                        <span class="nav-text">صندوق ورودی</span>
+                        <span class="nav-badge" id="inboxBadge">0</span>
+                    </a>
+                    <a href="#" class="nav-item" data-type="sent">
+                        <span class="nav-icon">📤</span>
+                        <span class="nav-text">ارسال شده</span>
+                    </a>
+                    <a href="#" class="nav-item" data-type="starred">
+                        <span class="nav-icon">⭐</span>
+                        <span class="nav-text">ستاره‌دار</span>
+                    </a>
+                    <a href="#" class="nav-item" data-type="spam">
+                        <span class="nav-icon">🚫</span>
+                        <span class="nav-text">اسپم</span>
+                    </a>
+                </nav>
+            </aside>
+
+            <main class="messages-area">
+                <div class="messages-toolbar">
+                    <div class="toolbar-left">
+                        <input type="checkbox" id="selectAll" class="select-checkbox">
+                        <button class="toolbar-btn" id="refreshBtn" title="بروزرسانی">
+                            <span>🔄</span>
+                        </button>
+                        <button class="toolbar-btn" id="archiveBtn" title="آرشیو">
+                            <span>📦</span>
+                        </button>
+                        <button class="toolbar-btn" id="deleteBtn" title="حذف">
+                            <span>🗑️</span>
+                        </button>
+                    </div>
+                    <div class="toolbar-right">
+                        <span class="messages-count" id="messagesCount">0 پیام</span>
+                    </div>
+                </div>
+
+                <div class="messages-list" id="messagesList">
+                    <div class="loading-spinner" id="loadingSpinner">
+                        <div class="spinner"></div>
+                        <p>در حال بارگذاری...</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Compose Modal -->
+    <div class="compose-modal" id="composeModal">
+        <div class="compose-modal-content">
+            <div class="compose-header">
+                <h2>نوشتن پیام جدید</h2>
+                <button class="close-compose-btn" id="closeComposeBtn">×</button>
+            </div>
+            <form id="composeForm" enctype="multipart/form-data">
+                <div class="compose-form-group">
+                    <label for="receiverInput">گیرنده (ایمیل)</label>
+                    <div class="receiver-combobox-wrapper">
+                        <input type="text" 
+                               id="receiverInput" 
+                               name="receiver_email" 
+                               class="receiver-input" 
+                               placeholder="ایمیل گیرنده را وارد کنید..."
+                               autocomplete="off">
+                        <button type="button" class="contacts-icon-btn" id="contactsIconBtn" title="مشاهده لیست مخاطبین">
+                            <span>👥</span>
+                        </button>
+                        <span class="select-icon">👤</span>
+                        <div class="contacts-dropdown" id="contactsDropdown">
+                            <div class="contacts-dropdown-header">
+                                <span>مخاطبین</span>
+                                <button type="button" class="close-contacts-btn" id="closeContactsBtn">×</button>
+                            </div>
+                            <div class="contacts-dropdown-list" id="contactsDropdownList">
+                                <div class="loading-contacts-inline">
+                                    <span>در حال بارگذاری...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="loading-contacts" id="loadingContacts" style="display: none;">
+                        <span>در حال بارگذاری کانتکت‌ها...</span>
+                    </div>
+                </div>
+
+                <div class="compose-form-group">
+                    <label class="privacy-toggle">
+                        <input type="checkbox" id="isPrivateCheckbox" checked>
+                        <span class="toggle-slider">
+                            <span class="toggle-icon">🔒</span>
+                        </span>
+                        <span class="toggle-label">
+                            <span class="toggle-label-icon">🔒</span>
+                            <span class="toggle-label-text">پیام خصوصی</span>
+                        </span>
+                    </label>
+                </div>
+
+                <div class="compose-form-group">
+                    <label for="subjectInput">موضوع</label>
+                    <input type="text" id="subjectInput" name="subject" required placeholder="موضوع پیام...">
+                </div>
+
+                <div class="compose-form-group">
+                    <label for="bodyTextarea">متن پیام</label>
+                    <textarea id="bodyTextarea" name="body" required rows="8" placeholder="متن پیام خود را بنویسید..."></textarea>
+                </div>
+
+                <div class="compose-form-group">
+                    <label for="attachmentInput" class="attachment-label">
+                        <span>📎</span>
+                        <span>افزودن فایل ضمیمه (حداکثر 10MB)</span>
+                    </label>
+                    <input type="file" id="attachmentInput" name="attachment" accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.gif,.zip,.rar">
+                    <div class="file-info" id="fileInfo" style="display: none;">
+                        <span id="fileName"></span>
+                        <button type="button" class="remove-file-btn" id="removeFileBtn">×</button>
+                    </div>
+                </div>
+
+                <div class="compose-actions">
+                    <button type="button" class="cancel-btn" id="cancelComposeBtn">لغو</button>
+                    <button type="submit" class="send-btn" id="sendBtn">
+                        <span>ارسال</span>
+                    </button>
+                </div>
+
+                <div class="compose-error" id="composeError" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Message Detail Modal -->
+    <div class="compose-modal" id="messageDetailModal">
+        <div class="compose-modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="compose-header">
+                <h2>مشاهده پیام</h2>
+                <button class="close-compose-btn" id="closeMessageDetailBtn">×</button>
+            </div>
+            <div id="messageDetailContent">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                    <p>در حال بارگذاری...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/loading.js' %}?v=2"></script>
+    <script src="{% static 'js/inbox.js' %}?v=2"></script>
+</body>
+</html>
+

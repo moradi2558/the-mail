@@ -78,6 +78,18 @@ class MessageService:
             messages = Message.objects.filter(
                 models.Q(receiver=user) | models.Q(is_private=False)
             )
+        elif message_type == 'starred':
+            # Only starred messages
+            messages = Message.objects.filter(
+                models.Q(sender=user) | models.Q(receiver=user) | models.Q(is_private=False),
+                is_starred=True
+            )
+        elif message_type == 'spam':
+            # Only spam messages
+            messages = Message.objects.filter(
+                models.Q(sender=user) | models.Q(receiver=user) | models.Q(is_private=False),
+                is_spam=True
+            )
         else:
             # All messages (sent and received)
             messages = Message.objects.filter(
@@ -153,4 +165,64 @@ class MessageService:
             return message
         except Message.DoesNotExist:
             raise ValidationError('پیام یافت نشد')
+    
+    @staticmethod
+    def is_blocked(blocker, blocked):
+        """Check if a user is blocked by another user"""
+        return Block.objects.filter(blocker=blocker, blocked=blocked).exists()
+    
+    @staticmethod
+    def get_user_contacts(user):
+        """Get all contacts for a user (users who have sent or received messages)"""
+        sent_to = User.objects.filter(received_messages__sender=user).distinct()
+        received_from = User.objects.filter(sent_messages__receiver=user).distinct()
+        contacts = (sent_to | received_from).distinct().exclude(id=user.id)
+        return contacts
+    
+    @staticmethod
+    def toggle_star(message, user):
+        """Toggle star status of a message"""
+        if message.sender != user and message.receiver != user:
+            raise ValidationError('شما دسترسی به این پیام ندارید')
+        
+        message.is_starred = not message.is_starred
+        message.save()
+        return message
+    
+    @staticmethod
+    def block_user(blocker, blocked_email, is_spam=False):
+        """Block a user"""
+        try:
+            blocked = User.objects.get(email=blocked_email)
+        except User.DoesNotExist:
+            raise ValidationError('کاربر با این ایمیل یافت نشد')
+        
+        if blocker == blocked:
+            raise ValidationError('شما نمی‌توانید خودتان را بلاک کنید')
+        
+        block, created = Block.objects.get_or_create(
+            blocker=blocker,
+            blocked=blocked,
+            defaults={'is_spam': is_spam}
+        )
+        
+        if not created:
+            block.is_spam = is_spam
+            block.save()
+        
+        return block
+    
+    @staticmethod
+    def unblock_user(blocker, blocked_email):
+        """Unblock a user"""
+        try:
+            blocked = User.objects.get(email=blocked_email)
+        except User.DoesNotExist:
+            raise ValidationError('کاربر با این ایمیل یافت نشد')
+        
+        try:
+            block = Block.objects.get(blocker=blocker, blocked=blocked)
+            block.delete()
+        except Block.DoesNotExist:
+            raise ValidationError('این کاربر بلاک نشده است')
 

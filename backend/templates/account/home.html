@@ -1,0 +1,115 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mail - پروفایل</title>
+    <link rel="stylesheet" href="{% static 'css/inbox.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-container">
+        <div class="forest-background"></div>
+    </div>
+
+    <div class="inbox-container">
+        <header class="inbox-header">
+            <div class="header-left">
+                <h1 class="logo">D-Mail</h1>
+            </div>
+            <div class="header-right">
+                <a href="/inbox/" class="compose-btn" style="text-decoration: none; color: inherit;">
+                    <span>📥</span>
+                    <span>صندوق ورودی</span>
+                </a>
+                <div class="user-menu">
+                    <a href="/home/" class="user-btn" id="profileBtn" onclick="showLoading('در حال انتقال');">
+                        <span class="user-avatar">👤</span>
+                    </a>
+                    <button class="user-btn logout-btn" id="logoutBtn" onclick="logout()" title="خروج">
+                        <span style="font-size: 18px;">⏻</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="inbox-content">
+            <main class="messages-area" style="justify-content: center; align-items: center;">
+                <div style="text-align: center; padding: 50px 20px;">
+                    <h1 style="font-size: 48px; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #8e24aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        به D-Mail خوش آمدید!
+                    </h1>
+                    <p style="font-size: 20px; color: #ffffff; margin-bottom: 30px;">
+                        شما با موفقیت وارد شدید
+                    </p>
+                    <button onclick="openProfileModal()" style="padding: 15px 40px; background: linear-gradient(135deg, #533483, #8e24aa); border: none; border-radius: 10px; color: #ffffff; font-family: 'Vazirmatn', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; margin: 10px;">
+                        مشاهده پروفایل
+                    </button>
+                    <button onclick="openChangePasswordModal()" style="padding: 15px 40px; background: rgba(83, 52, 131, 0.6); border: 1px solid #533483; border-radius: 10px; color: #ffffff; font-family: 'Vazirmatn', sans-serif; font-size: 16px; font-weight: 600; cursor: pointer; margin: 10px;">
+                        تغییر رمز عبور
+                    </button>
+                    <a href="/inbox/" style="padding: 15px 40px; background: rgba(42, 42, 62, 0.6); border: 1px solid #2a2a3e; border-radius: 10px; color: #ffffff; font-family: 'Vazirmatn', sans-serif; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-block; margin: 10px;">
+                        رفتن به صندوق ورودی
+                    </a>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Profile Modal -->
+    <div class="compose-modal" id="profileModal">
+        <div class="compose-modal-content">
+            <div class="compose-header">
+                <h2>پروفایل کاربری</h2>
+                <button class="close-compose-btn" id="closeProfileBtn">×</button>
+            </div>
+            <div id="profileContent" style="padding: 30px;">
+                <div class="loading-spinner" id="profileLoading">
+                    <div class="spinner"></div>
+                    <p>در حال بارگذاری...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Change Password Modal -->
+    <div class="compose-modal" id="changePasswordModal">
+        <div class="compose-modal-content">
+            <div class="compose-header">
+                <h2>تغییر رمز عبور</h2>
+                <button class="close-compose-btn" id="closeChangePasswordBtn">×</button>
+            </div>
+            <div id="changePasswordContent" style="padding: 30px;">
+                <form id="changePasswordForm">
+                    <div class="compose-form-group">
+                        <label for="oldPassword">رمز عبور فعلی</label>
+                        <input type="password" id="oldPassword" name="old_password" placeholder="رمز عبور فعلی را وارد کنید" required>
+                    </div>
+                    <div class="compose-form-group">
+                        <label for="newPassword">رمز عبور جدید</label>
+                        <input type="password" id="newPassword" name="new_password" placeholder="رمز عبور جدید را وارد کنید" required>
+                    </div>
+                    <div class="compose-form-group">
+                        <label for="newPasswordConfirm">تکرار رمز عبور جدید</label>
+                        <input type="password" id="newPasswordConfirm" name="new_password_confirm" placeholder="تکرار رمز عبور جدید را وارد کنید" required>
+                    </div>
+                    <div class="compose-actions">
+                        <button type="button" class="cancel-btn" onclick="closeChangePasswordModal()">لغو</button>
+                        <button type="submit" class="send-btn" id="changePasswordBtn">
+                            <span>تغییر رمز عبور</span>
+                        </button>
+                    </div>
+                    <div class="compose-error" id="changePasswordError" style="display: none;"></div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/loading.js' %}"></script>
+    <script src="{% static 'js/home.js' %}"></script>
+</body>
+</html>

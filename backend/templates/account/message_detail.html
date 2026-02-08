@@ -1,0 +1,163 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mail - مشاهده پیام</title>
+    <link rel="stylesheet" href="{% static 'css/inbox.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .message-detail-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .message-detail-header {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .message-detail-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        .message-detail-btn {
+            padding: 10px 20px;
+            background: rgba(83, 52, 131, 0.6);
+            border: 1px solid var(--arcane-purple);
+            border-radius: 8px;
+            color: var(--arcane-white);
+            cursor: pointer;
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .message-detail-btn:hover {
+            background: rgba(83, 52, 131, 0.8);
+            transform: translateY(-2px);
+        }
+        .message-detail-content {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+        .message-detail-body {
+            margin-top: 20px;
+            line-height: 1.8;
+            color: var(--arcane-white);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .message-detail-attachment {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(42, 42, 62, 0.4);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .attachment-icon {
+            font-size: 24px;
+        }
+        .attachment-info {
+            flex-grow: 1;
+        }
+        .attachment-name {
+            font-weight: 600;
+            color: var(--arcane-white);
+        }
+        .attachment-size {
+            font-size: 0.9em;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        .attachment-download {
+            padding: 8px 15px;
+            background: var(--arcane-purple);
+            border: none;
+            border-radius: 8px;
+            color: var(--arcane-white);
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: rgba(42, 42, 62, 0.6);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: var(--arcane-white);
+            text-decoration: none;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        .back-btn:hover {
+            background: rgba(83, 52, 131, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <div class="forest-background"></div>
+    </div>
+
+    <div class="inbox-container">
+        <header class="inbox-header">
+            <div class="header-left">
+                <h1 class="logo">D-Mail</h1>
+            </div>
+            <div class="header-right">
+                <a href="/inbox/" class="compose-btn" style="text-decoration: none; color: inherit;">
+                    <span>📥</span>
+                    <span>صندوق ورودی</span>
+                </a>
+                <div class="user-menu">
+                    <a href="/home/" class="user-btn" id="profileBtn" onclick="showLoading('در حال انتقال');">
+                        <span class="user-avatar">👤</span>
+                    </a>
+                    <button class="user-btn logout-btn" id="logoutBtn" onclick="logout()" title="خروج">
+                        <span style="font-size: 18px;">⏻</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="inbox-content">
+            <main class="messages-area">
+                <div class="message-detail-container">
+                    <a href="/inbox/" class="back-btn">
+                        <span>←</span>
+                        <span>بازگشت به صندوق ورودی</span>
+                    </a>
+
+                    <div id="messageDetailContent">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                            <p>در حال بارگذاری...</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="{% static 'js/loading.js' %}"></script>
+    <script src="{% static 'js/message_detail.js' %}"></script>
+</body>
+</html>
+
