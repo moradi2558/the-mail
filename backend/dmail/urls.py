@@ -25,6 +25,7 @@ urlpatterns = [
     path('', include('home.urls')),
     path('api/account/', include('acoount.urls')),
     path('api/message/', include('message.urls')),
+    path('api/music/', include('music.urls')),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
 ]

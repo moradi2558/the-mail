@@ -5,8 +5,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.contrib.auth import get_user_model
 from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer, BlockUserSerializer, BlockedUserSerializer
 from .services import MessageService
+
+User = get_user_model()
 
 
 class SendMessageView(APIView):
@@ -506,6 +509,57 @@ class ArchiveMessageView(APIView):
             return Response({
                 'error': str(e)
             }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SearchEmailsView(APIView):
+    """
+    API View for searching emails (autocomplete)
+    GET /api/message/search-emails/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Search for emails by query string
+        Query params:
+            - q: search query (required)
+            - limit: max results (default: 10)
+        """
+        query = request.query_params.get('q', '').strip()
+        limit = int(request.query_params.get('limit', 10))
+        
+        if not query:
+            return Response({
+                'message': 'پارامتر جستجو (q) الزامی است',
+                'data': []
+            }, status=status.HTTP_200_OK)
+        
+        try:
+            # Search in all users (excluding current user)
+            from django.db.models import Q
+            users = User.objects.filter(
+                Q(email__icontains=query) | Q(username__icontains=query)
+            ).exclude(id=request.user.id).exclude(email__isnull=True).exclude(email='')[:limit]
+            
+            # Serialize results
+            results = []
+            for user in users:
+                results.append({
+                    'email': user.email,
+                    'username': user.username,
+                    'name': getattr(user, 'name', None) or user.username
+                })
+            
+            return Response({
+                'message': 'نتایج جستجو با موفقیت دریافت شد',
+                'count': len(results),
+                'data': results
+            }, status=status.HTTP_200_OK)
+        
         except Exception as e:
             return Response({
                 'error': str(e)
