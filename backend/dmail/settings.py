@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'acoount',
     'message',
     'home',
+    'music',
 ]
 
 MIDDLEWARE = [
