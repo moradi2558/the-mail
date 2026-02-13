@@ -2,11 +2,15 @@
 const API_BASE_URL = '/api/message';
 let currentMessages = [];
 let currentType = 'inbox';
+let currentMessageId = null;
+let searchTimeout = null;
+let currentSearchQuery = '';
 
 document.addEventListener('DOMContentLoaded', function() {
     hideLoading();
     checkAuth();
     setupEventListeners();
+    updateArchiveButton();
     loadMessages('inbox');
 });
 
@@ -27,6 +31,12 @@ function setupEventListeners() {
             if (type) {
                 navItems.forEach(nav => nav.classList.remove('active'));
                 this.classList.add('active');
+                // Clear search when switching tabs
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.value = '';
+                    currentSearchQuery = '';
+                }
                 loadMessages(type);
             }
         });
@@ -45,9 +55,42 @@ function setupEventListeners() {
         const checkboxes = document.querySelectorAll('.message-checkbox');
         checkboxes.forEach(cb => cb.checked = this.checked);
     });
+
+    document.getElementById('archiveBtn').addEventListener('click', function() {
+        archiveSelectedMessages();
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) {
+        searchInput.addEventListener('input', function(e) {
+            const query = e.target.value.trim();
+            currentSearchQuery = query;
+            
+            // Clear previous timeout
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Debounce: wait 500ms after user stops typing
+            searchTimeout = setTimeout(() => {
+                performSearch(query);
+            }, 500);
+        });
+        
+        // Also search on Enter key
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (searchTimeout) {
+                    clearTimeout(searchTimeout);
+                }
+                performSearch(e.target.value.trim());
+            }
+        });
+    }
 }
 
-async function loadMessages(type = 'inbox') {
+async function loadMessages(type = 'inbox', searchQuery = '') {
     currentType = type;
     const token = localStorage.getItem('access_token');
     
@@ -61,12 +104,17 @@ async function loadMessages(type = 'inbox') {
     messagesList.innerHTML = `
         <div class="loading-spinner" id="loadingSpinner">
             <div class="spinner"></div>
-            <p>در حال بارگذاری...</p>
+            <p>${searchQuery ? 'در حال جستجو...' : 'در حال بارگذاری...'}</p>
         </div>
     `;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/list/?type=${type}`, {
+        let url = `${API_BASE_URL}/list/?type=${type}`;
+        if (searchQuery && searchQuery.trim()) {
+            url += `&search=${encodeURIComponent(searchQuery.trim())}`;
+        }
+        
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -88,12 +136,22 @@ async function loadMessages(type = 'inbox') {
             displayMessages(data.data);
             updateMessagesCount(data.count || data.data.length);
             updateInboxBadge(data.data.filter(msg => !msg.read_at && msg.receiver_email).length);
+            updateArchiveButton();
         } else {
             showError('خطا در دریافت پیام‌ها');
         }
     } catch (error) {
         console.error('Error:', error);
         showError('خطا در ارتباط با سرور');
+    }
+}
+
+function performSearch(query) {
+    if (query && query.trim()) {
+        loadMessages(currentType, query);
+    } else {
+        // If search is cleared, reload messages without search
+        loadMessages(currentType);
     }
 }
 
@@ -205,6 +263,19 @@ function updateInboxBadge(count) {
     if (badge) {
         badge.textContent = count > 0 ? count : '';
         badge.style.display = count > 0 ? 'block' : 'none';
+    }
+}
+
+function updateArchiveButton() {
+    const archiveBtn = document.getElementById('archiveBtn');
+    if (archiveBtn) {
+        if (currentType === 'archived') {
+            archiveBtn.title = 'خروج از آرشیو';
+            archiveBtn.innerHTML = '<span>📤</span>';
+        } else {
+            archiveBtn.title = 'آرشیو';
+            archiveBtn.innerHTML = '<span>📦</span>';
+        }
     }
 }
 
@@ -594,6 +665,7 @@ function showSuccessMessage(message) {
 }
 
 async function openMessageDetail(messageId) {
+    currentMessageId = messageId;
     const modal = document.getElementById('messageDetailModal');
     const contentDiv = document.getElementById('messageDetailContent');
     const token = localStorage.getItem('access_token');
@@ -678,21 +750,8 @@ function displayMessageDetailInModal(message) {
         ? `<img src="${message.sender_profile_image}" alt="${senderName}">`
         : `<span>${senderName.charAt(0).toUpperCase()}</span>`;
     
-    const receiverInfo = message.receiver_email 
-        ? (() => {
-            const receiverName = message.receiver_name || message.receiver_username;
-            const receiverEmail = message.receiver_email;
-            if (receiverName && receiverName !== receiverEmail) {
-                return `<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);">
-                    <strong>گیرنده:</strong> ${escapeHtml(receiverName)} (${escapeHtml(receiverEmail)})
-                </div>`;
-            } else {
-                return `<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);">
-                    <strong>گیرنده:</strong> ${escapeHtml(receiverEmail)}
-                </div>`;
-            }
-        })()
-        : '<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);"><strong>نوع:</strong> پیام عمومی</div>';
+    // بر اساس درخواست شما، بخش نمایش گیرنده را به‌طور کامل حذف کردیم
+    const receiverInfo = '';
     
     const attachmentSection = message.has_attachment && message.attachment_url
         ? `
@@ -708,9 +767,6 @@ function displayMessageDetailInModal(message) {
         : '';
     
     const time = formatTime(message.created_at);
-    const badges = [];
-    if (message.is_starred) badges.push('⭐ ستاره‌دار');
-    if (message.is_spam) badges.push('🚫 اسپم');
     
     contentDiv.innerHTML = `
         <div style="padding: 20px;">
@@ -728,38 +784,48 @@ function displayMessageDetailInModal(message) {
                 </div>
             </div>
             
-            <div style="font-size: 24px; font-weight: 600; color: var(--arcane-white); margin-bottom: 15px;">
-                ${escapeHtml(message.subject || '(بدون موضوع)')}
-            </div>
-            
-            ${receiverInfo}
-            
-            <div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
-                <strong>زمان:</strong> ${time}
-            </div>
-            
-            ${badges.length > 0 ? `
-                <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    ${badges.map(badge => `<span style="padding: 5px 10px; background: rgba(83, 52, 131, 0.3); border-radius: 5px; font-size: 12px;">${badge}</span>`).join('')}
+            <div style="margin-bottom: 20px; text-align: right;">
+                <div style="font-size: 16px; font-weight: 600; color: rgba(255, 255, 255, 0.8);">
+                    موضوع:
+                    <span style="margin-right: 8px; font-size: 20px; font-weight: 600; color: var(--arcane-white);">
+                        ${escapeHtml(message.subject || '(بدون موضوع)')}
+                    </span>
                 </div>
-            ` : ''}
-            
-            <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button onclick="toggleStarInModal(${message.id})" style="padding: 10px 20px; background: rgba(83, 52, 131, 0.6); border: 1px solid var(--arcane-purple); border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
-                    ${message.is_starred ? '⭐ حذف ستاره' : '⭐ ستاره‌دار'}
-                </button>
-                ${message.public_link_url ? `
-                    <button onclick="copyPublicLink('${message.public_link_url}')" style="padding: 10px 20px; background: rgba(83, 52, 131, 0.6); border: 1px solid var(--arcane-purple); border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
-                        🔗 کپی لینک عمومی
-                    </button>
-                ` : ''}
             </div>
             
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
-                <div style="line-height: 1.8; color: var(--arcane-white); white-space: pre-wrap; word-wrap: break-word;">
+            <div style="margin-bottom: 20px; text-align: right;">
+                <div style="line-height: 1.8; color: var(--arcane-white); white-space: pre-wrap; word-wrap: break-word; text-align: right;">
                     ${escapeHtml(message.body || '')}
                 </div>
                 ${attachmentSection}
+            </div>
+            
+            <div style="margin-bottom: 20px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                ${time}
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button onclick="toggleStarInModal(${message.id})" style="padding: 10px 20px; background: rgba(83, 52, 131, 0.6); border: 1px solid var(--arcane-purple); border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
+                        ${message.is_starred ? '⭐ حذف ستاره' : '⭐ ستاره‌دار'}
+                    </button>
+                    <button onclick="archiveMessage(${message.id}, ${message.status === 'archived'})" style="padding: 10px 20px; background: rgba(83, 52, 131, 0.6); border: 1px solid var(--arcane-purple); border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
+                        ${message.status === 'archived' ? '📦 خروج از آرشیو' : '📦 آرشیو'}
+                    </button>
+                    ${message.receiver_email ? `
+                        <button onclick="toggleSenderSpamInModal(${message.id}, ${message.is_sender_spam || false})" style="padding: 10px 20px; background: ${message.is_sender_spam ? 'rgba(40, 167, 69, 0.6)' : 'rgba(220, 53, 69, 0.6)'}; border: 1px solid ${message.is_sender_spam ? '#28a745' : '#dc3545'}; border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
+                            ${message.is_sender_spam ? '✅ خروج از اسپم' : '🚫 اسپم'}
+                        </button>
+                        <button onclick="toggleBlockSenderInModal('${escapeHtml(message.sender_email)}', ${message.is_sender_blocked || false}, ${message.id})" style="padding: 10px 20px; background: ${message.is_sender_blocked ? 'rgba(40, 167, 69, 0.6)' : 'rgba(220, 53, 69, 0.6)'}; border: 1px solid ${message.is_sender_blocked ? '#28a745' : '#dc3545'}; border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
+                            ${message.is_sender_blocked ? '✅ خروج از بلاک' : '🚫 بلاک'}
+                        </button>
+                    ` : ''}
+                    ${message.public_link_url ? `
+                        <button onclick="copyPublicLink('${message.public_link_url}')" style="padding: 10px 20px; background: rgba(83, 52, 131, 0.6); border: 1px solid var(--arcane-purple); border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px;">
+                            🔗 کپی لینک عمومی
+                        </button>
+                    ` : ''}
+                </div>
             </div>
         </div>
     `;
@@ -815,11 +881,235 @@ async function toggleStarInModal(messageId) {
     }
 }
 
+async function toggleSenderSpamInModal(messageId, isCurrentlySpam) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    
+    const action = isCurrentlySpam ? 'unmark' : 'mark';
+    const confirmMessage = isCurrentlySpam 
+        ? 'آیا مطمئن هستید که می‌خواهید این فرستنده را از اسپم خارج کنید؟'
+        : 'آیا مطمئن هستید که می‌خواهید این فرستنده را به عنوان اسپم علامت بزنید؟ تمام پیام‌های بعدی از این فرستنده به طور خودکار به اسپم منتقل می‌شوند.';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        showLoading(isCurrentlySpam ? 'در حال خارج کردن از اسپم' : 'در حال علامت‌گذاری به عنوان اسپم');
+        const response = await fetch(`${API_BASE_URL}/${messageId}/mark-sender-spam/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            alert(data.message || (isCurrentlySpam ? 'فرستنده از اسپم خارج شد' : 'فرستنده به عنوان اسپم علامت زده شد'));
+            // Update modal content immediately
+            if (data.data) {
+                displayMessageDetailInModal(data.data);
+            }
+            // Reload messages in background
+            loadMessages(currentType).catch(err => console.error('Error reloading messages:', err));
+            hideLoading();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'خطا در تغییر وضعیت اسپم');
+            hideLoading();
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+        hideLoading();
+    }
+}
+
+async function toggleBlockSenderInModal(senderEmail, isCurrentlyBlocked, messageId) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    
+    const confirmMessage = isCurrentlyBlocked 
+        ? 'آیا مطمئن هستید که می‌خواهید این فرستنده را از بلاک خارج کنید؟'
+        : 'آیا مطمئن هستید که می‌خواهید این فرستنده را بلاک کنید؟ این کاربر دیگر نمی‌تواند به شما پیام ارسال کند.';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        showLoading(isCurrentlyBlocked ? 'در حال خارج کردن از بلاک' : 'در حال بلاک کردن');
+        
+        if (isCurrentlyBlocked) {
+            // Unblock user
+            const response = await fetch(`${API_BASE_URL}/unblock/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: senderEmail })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                showSuccessMessage(data.message || 'فرستنده از بلاک خارج شد');
+                // Reload message detail to update button state
+                if (messageId) {
+                    await openMessageDetail(messageId);
+                }
+            } else {
+                const data = await response.json();
+                alert(data.error || 'خطا در خروج از بلاک');
+            }
+        } else {
+            // Block user
+            const response = await fetch(`${API_BASE_URL}/block/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email: senderEmail, is_spam: false })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                showSuccessMessage(data.message || 'فرستنده بلاک شد');
+                // Reload message detail to update button state
+                if (messageId) {
+                    await openMessageDetail(messageId);
+                }
+            } else {
+                const data = await response.json();
+                alert(data.error || 'خطا در بلاک کردن');
+            }
+        }
+        
+        hideLoading();
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+        hideLoading();
+    }
+}
+
 function copyPublicLink(url) {
     navigator.clipboard.writeText(url).then(() => {
         alert('لینک عمومی کپی شد');
     }).catch(() => {
         alert('خطا در کپی لینک');
     });
+}
+
+async function archiveSelectedMessages() {
+    const checkboxes = document.querySelectorAll('.message-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('لطفاً حداقل یک پیام را انتخاب کنید');
+        return;
+    }
+    
+    const messageIds = Array.from(checkboxes).map(cb => {
+        const messageItem = cb.closest('.message-item');
+        return messageItem ? messageItem.dataset.id : null;
+    }).filter(id => id !== null);
+    
+    if (messageIds.length === 0) {
+        alert('خطا در دریافت شناسه پیام‌ها');
+        return;
+    }
+    
+    // بررسی اینکه آیا در صفحه آرشیو هستیم یا نه
+    const isArchived = currentType === 'archived';
+    const action = isArchived ? 'unarchive' : 'archive';
+    const confirmMessage = isArchived
+        ? `آیا مطمئن هستید که می‌خواهید ${messageIds.length} پیام را از آرشیو خارج کنید؟`
+        : `آیا مطمئن هستید که می‌خواهید ${messageIds.length} پیام را به آرشیو منتقل کنید؟`;
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/';
+        return;
+    }
+    
+    showLoading(isArchived ? 'در حال خروج از آرشیو' : 'در حال آرشیو کردن پیام‌ها');
+    
+    try {
+        const promises = messageIds.map(messageId => 
+            fetch(`${API_BASE_URL}/${messageId}/archive/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: action })
+            })
+        );
+        
+        const responses = await Promise.all(promises);
+        const failed = responses.filter(r => !r.ok);
+        
+        if (failed.length > 0) {
+            alert(`خطا در ${isArchived ? 'خروج از آرشیو' : 'آرشیو کردن'} ${failed.length} پیام`);
+        } else {
+            const successMessage = isArchived
+                ? `${messageIds.length} پیام با موفقیت از آرشیو خارج شد`
+                : `${messageIds.length} پیام با موفقیت به آرشیو منتقل شد`;
+            showSuccessMessage(successMessage);
+            await loadMessages(currentType);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function archiveMessage(messageId, isArchived = false) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    
+    const action = isArchived ? 'unarchive' : 'archive';
+    const confirmMessage = isArchived 
+        ? 'آیا مطمئن هستید که می‌خواهید این پیام را از آرشیو خارج کنید؟'
+        : 'آیا مطمئن هستید که می‌خواهید این پیام را به آرشیو منتقل کنید؟';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        showLoading(isArchived ? 'در حال خروج از آرشیو' : 'در حال آرشیو کردن');
+        const response = await fetch(`${API_BASE_URL}/${messageId}/archive/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            showSuccessMessage(data.message || (isArchived ? 'پیام با موفقیت از آرشیو خارج شد' : 'پیام با موفقیت به آرشیو منتقل شد'));
+            await loadMessages(currentType);
+            closeMessageDetail();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'خطا در تغییر وضعیت آرشیو');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+    } finally {
+        hideLoading();
+    }
 }
 

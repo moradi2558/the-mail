@@ -47,7 +47,7 @@
                     <a href="/inbox/" class="nav-item active" data-type="inbox">
                         <span class="nav-icon">📥</span>
                         <span class="nav-text">صندوق ورودی</span>
-                        <span class="nav-badge" id="inboxBadge">0</span>
+                        <span class="nav-badge" id="inboxBadge" style="display: none;"></span>
                     </a>
                     <a href="#" class="nav-item" data-type="sent">
                         <span class="nav-icon">📤</span>
@@ -60,6 +60,10 @@
                     <a href="#" class="nav-item" data-type="spam">
                         <span class="nav-icon">🚫</span>
                         <span class="nav-text">اسپم</span>
+                    </a>
+                    <a href="#" class="nav-item" data-type="archived">
+                        <span class="nav-icon">📦</span>
+                        <span class="nav-text">آرشیو</span>
                     </a>
                 </nav>
             </aside>
@@ -194,8 +198,8 @@
         </div>
     </div>
 
-    <script src="{% static 'js/loading.js' %}?v=2"></script>
-    <script src="{% static 'js/inbox.js' %}?v=2"></script>
+    <script src="{% static 'js/loading.js' %}?v=3"></script>
+    <script src="{% static 'js/inbox.js' %}?v=3"></script>
 </body>
 </html>
 

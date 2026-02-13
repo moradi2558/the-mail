@@ -1,4 +1,9 @@
+let __globalLoadingTimeout = null;
+
 function showLoading(message = 'در حال بارگذاری') {
+    // اگر قبلاً لودینگ باز بوده، ببند
+    hideLoading();
+
     const loadingHTML = `
         <div class="loading-overlay" id="pageLoading">
             <div class="loading-container">
@@ -16,8 +21,15 @@ function showLoading(message = 'در حال بارگذاری') {
             </div>
         </div>
     `;
-    
     document.body.insertAdjacentHTML('beforeend', loadingHTML);
+
+    // فِیل‌سیف: اگر به هر دلیل hideLoading صدا نشد، بعد از ۱۵ ثانیه خودش بسته شود
+    if (__globalLoadingTimeout) {
+        clearTimeout(__globalLoadingTimeout);
+    }
+    __globalLoadingTimeout = setTimeout(() => {
+        hideLoading();
+    }, 15000);
 }
 
 function hideLoading() {
@@ -28,37 +40,21 @@ function hideLoading() {
             loading.remove();
         }, 300);
     }
+
+    if (__globalLoadingTimeout) {
+        clearTimeout(__globalLoadingTimeout);
+        __globalLoadingTimeout = null;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+    // فقط اگر لودینگی از قبل باقی مانده، آن را مخفی کن
     hideLoading();
-    
+
+    // یک‌بار دیگر با تاخیر کوتاه برای اطمینان
     setTimeout(() => {
         hideLoading();
     }, 100);
-    
-    const links = document.querySelectorAll('a[href]');
-    links.forEach(link => {
-        link.addEventListener('click', function(e) {
-            const href = this.getAttribute('href');
-            if (href && !href.startsWith('#') && !href.startsWith('javascript:') && !this.hasAttribute('target') && !href.includes('#')) {
-                const targetUrl = new URL(href, window.location.origin);
-                const currentUrl = new URL(window.location.href);
-                if (targetUrl.pathname !== currentUrl.pathname) {
-                    showLoading('در حال انتقال');
-                }
-            }
-        });
-    });
-    
-    const forms = document.querySelectorAll('form');
-    forms.forEach(form => {
-        form.addEventListener('submit', function() {
-            if (!form.id || form.id !== 'composeForm') {
-                showLoading('در حال ارسال');
-            }
-        });
-    });
 });
 
 window.addEventListener('load', function() {

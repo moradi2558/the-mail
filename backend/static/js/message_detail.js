@@ -75,21 +75,8 @@ function displayMessageDetail(message) {
         ? `<img src="${message.sender_profile_image}" alt="${senderName}">`
         : `<span>${senderName.charAt(0).toUpperCase()}</span>`;
     
-    const receiverInfo = message.receiver_email 
-        ? (() => {
-            const receiverName = message.receiver_name || message.receiver_username;
-            const receiverEmail = message.receiver_email;
-            if (receiverName && receiverName !== receiverEmail) {
-                return `<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);">
-                    <strong>گیرنده:</strong> ${escapeHtml(receiverName)} (${escapeHtml(receiverEmail)})
-                </div>`;
-            } else {
-                return `<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);">
-                    <strong>گیرنده:</strong> ${escapeHtml(receiverEmail)}
-                </div>`;
-            }
-        })()
-        : '<div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7);"><strong>نوع:</strong> پیام عمومی</div>';
+    // بر اساس درخواست شما، بخش نمایش گیرنده را به‌طور کامل حذف کردیم
+    const receiverInfo = '';
     
     const attachmentSection = message.has_attachment && message.attachment_url
         ? `
@@ -105,14 +92,10 @@ function displayMessageDetail(message) {
         : '';
     
     const time = formatTime(message.created_at);
-    const badges = [];
-    if (message.is_starred) badges.push('⭐ ستاره‌دار');
-    if (message.is_important) badges.push('❗ مهم');
-    if (message.is_spam) badges.push('🚫 اسپم');
     
     contentDiv.innerHTML = `
         <div class="message-detail-header">
-            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--glass-border);">
                 <div class="message-avatar" style="width: 60px; height: 60px; font-size: 24px;">
                     ${senderAvatar}
                 </div>
@@ -126,39 +109,43 @@ function displayMessageDetail(message) {
                 </div>
             </div>
             
-            <div style="font-size: 24px; font-weight: 600; color: var(--arcane-white); margin-bottom: 10px;">
-                ${escapeHtml(message.subject || '(بدون موضوع)')}
-            </div>
-            
-            ${receiverInfo}
-            
-            <div style="margin-top: 10px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
-                <strong>زمان:</strong> ${time}
-            </div>
-            
-            ${badges.length > 0 ? `
-                <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    ${badges.map(badge => `<span style="padding: 5px 10px; background: rgba(83, 52, 131, 0.3); border-radius: 5px; font-size: 12px;">${badge}</span>`).join('')}
+            <div style="margin-bottom: 20px; text-align: right;">
+                <div style="font-size: 16px; font-weight: 600; color: rgba(255, 255, 255, 0.8);">
+                    موضوع:
+                    <span style="margin-right: 8px; font-size: 20px; font-weight: 600; color: var(--arcane-white);">
+                        ${escapeHtml(message.subject || '(بدون موضوع)')}
+                    </span>
                 </div>
-            ` : ''}
+            </div>
             
-            <div class="message-detail-actions">
-                <button class="message-detail-btn" onclick="toggleStar()">
-                    ${message.is_starred ? '⭐ حذف ستاره' : '⭐ ستاره‌دار'}
-                </button>
-                ${message.public_link_url ? `
-                    <button class="message-detail-btn" onclick="copyPublicLink('${message.public_link_url}')">
-                        🔗 کپی لینک عمومی
+            <div class="message-detail-content" style="margin-bottom: 20px; text-align: right;">
+                <div class="message-detail-body" style="text-align: right;">
+                    ${escapeHtml(message.body || '')}
+                </div>
+                ${attachmentSection}
+            </div>
+            
+            <div style="margin-bottom: 20px; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                ${time}
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--glass-border);">
+                <div class="message-detail-actions">
+                    <button class="message-detail-btn" onclick="toggleStar()">
+                        ${message.is_starred ? '⭐ حذف ستاره' : '⭐ ستاره‌دار'}
                     </button>
-                ` : ''}
+                    ${message.receiver_email ? `
+                        <button class="message-detail-btn" onclick="toggleSenderSpam(${message.is_sender_spam})" style="background: ${message.is_sender_spam ? 'rgba(40, 167, 69, 0.6)' : 'rgba(220, 53, 69, 0.6)'}; border-color: ${message.is_sender_spam ? '#28a745' : '#dc3545'};">
+                            ${message.is_sender_spam ? '✅ خروج از اسپم' : '🚫 اسپم'}
+                        </button>
+                    ` : ''}
+                    ${message.public_link_url ? `
+                        <button class="message-detail-btn" onclick="copyPublicLink('${message.public_link_url}')">
+                            🔗 کپی لینک عمومی
+                        </button>
+                    ` : ''}
+                </div>
             </div>
-        </div>
-        
-        <div class="message-detail-content">
-            <div class="message-detail-body">
-                ${escapeHtml(message.body || '')}
-            </div>
-            ${attachmentSection}
         </div>
     `;
 }
@@ -199,6 +186,47 @@ async function toggleStar() {
         } else {
             const data = await response.json();
             alert(data.error || 'خطا در تغییر وضعیت ستاره');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+    } finally {
+        hideLoading();
+    }
+}
+
+async function toggleSenderSpam(isCurrentlySpam) {
+    const token = localStorage.getItem('access_token');
+    if (!token) return;
+    
+    const action = isCurrentlySpam ? 'unmark' : 'mark';
+    const confirmMessage = isCurrentlySpam 
+        ? 'آیا مطمئن هستید که می‌خواهید این فرستنده را از اسپم خارج کنید؟'
+        : 'آیا مطمئن هستید که می‌خواهید این فرستنده را به عنوان اسپم علامت بزنید؟ تمام پیام‌های بعدی از این فرستنده به طور خودکار به اسپم منتقل می‌شوند.';
+    
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+    
+    try {
+        showLoading(isCurrentlySpam ? 'در حال خارج کردن از اسپم' : 'در حال علامت‌گذاری به عنوان اسپم');
+        const response = await fetch(`${API_BASE_URL}/${messageId}/mark-sender-spam/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: action })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            alert(data.message || (isCurrentlySpam ? 'فرستنده از اسپم خارج شد' : 'فرستنده به عنوان اسپم علامت زده شد'));
+            // Reload message detail
+            await loadMessageDetail();
+        } else {
+            const data = await response.json();
+            alert(data.error || 'خطا در تغییر وضعیت اسپم');
         }
     } catch (error) {
         console.error('Error:', error);

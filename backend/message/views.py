@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.core.exceptions import ValidationError
 from django.db import models
-from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer, BlockUserSerializer
+from .serializers import MessageCreateSerializer, MessageListSerializer, MessageDetailSerializer, ContactSerializer, BlockUserSerializer, BlockedUserSerializer
 from .services import MessageService
 
 
@@ -68,13 +68,16 @@ class MessageListView(APIView):
         Get all messages for authenticated user
         Query params:
             - type: 'all', 'sent', 'received', 'inbox' (default: 'inbox')
+            - search: Optional search query string
         """
         message_type = request.query_params.get('type', 'inbox')
+        search_query = request.query_params.get('search', None)
         
         try:
             messages = MessageService.get_user_messages(
                 user=request.user,
-                message_type=message_type
+                message_type=message_type,
+                search_query=search_query
             )
             
             serializer = MessageListSerializer(messages, many=True, context={'request': request})
@@ -338,3 +341,172 @@ class UnblockUserView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class BlockedUsersListView(APIView):
+    """
+    API View for listing blocked users
+    GET /api/message/blocked/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get all users blocked by authenticated user
+        """
+        try:
+            from .models import Block
+            blocks = Block.objects.filter(blocker=request.user).select_related('blocked')
+            
+            blocked_users = [block.blocked for block in blocks]
+            block_info = {block.blocked.id: {'is_spam': block.is_spam, 'created_at': block.created_at} for block in blocks}
+            
+            serializer = BlockedUserSerializer(blocked_users, many=True, context={'request': request})
+            
+            # Add is_spam and blocked_at to each user
+            for item in serializer.data:
+                user_id = item['id']
+                if user_id in block_info:
+                    item['is_spam'] = block_info[user_id]['is_spam']
+                    item['blocked_at'] = block_info[user_id]['created_at']
+            
+            return Response({
+                'message': 'لیست کاربران بلاک شده با موفقیت دریافت شد',
+                'count': len(serializer.data),
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class MarkSenderAsSpamView(APIView):
+    """
+    API View for toggling spam status of a message sender
+    POST /api/message/<id>/mark-sender-spam/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, message_id):
+        """
+        Toggle spam status of message sender
+        Requires: Bearer Token
+        User must be receiver of the message
+        Body: {action: 'mark' or 'unmark'} (optional, defaults to toggle)
+        """
+        try:
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            # Only receiver can mark/unmark sender as spam
+            if message.receiver != request.user:
+                raise ValidationError('فقط گیرنده می‌تواند فرستنده را به عنوان اسپم علامت بزند یا از اسپم خارج کند')
+            
+            # Check current spam status
+            is_currently_spam = MessageService.is_spam_sender(
+                blocker=request.user,
+                blocked=message.sender
+            )
+            
+            # Get action from request body (optional)
+            action = request.data.get('action', 'toggle')
+            
+            if action == 'mark' or (action == 'toggle' and not is_currently_spam):
+                # Mark sender as spam
+                MessageService.mark_sender_as_spam(
+                    receiver=request.user,
+                    sender=message.sender
+                )
+                message_text = 'فرستنده به عنوان اسپم علامت زده شد و تمام پیام‌های بعدی از این فرستنده به طور خودکار به اسپم منتقل می‌شوند'
+            elif action == 'unmark' or (action == 'toggle' and is_currently_spam):
+                # Unmark sender as spam
+                MessageService.unmark_sender_as_spam(
+                    receiver=request.user,
+                    sender=message.sender
+                )
+                message_text = 'فرستنده از اسپم خارج شد و پیام‌های بعدی از این فرستنده به صندوق ورودی منتقل می‌شوند'
+            else:
+                raise ValidationError('عملیات نامعتبر')
+            
+            # Reload message to get updated data
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            serializer = MessageDetailSerializer(message, context={'request': request})
+            
+            return Response({
+                'message': message_text,
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except ValidationError as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ArchiveMessageView(APIView):
+    """
+    API View for archiving/unarchiving messages
+    POST /api/message/<id>/archive/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, message_id):
+        """
+        Archive or unarchive a message
+        Requires: Bearer Token
+        User must be sender or receiver of the message
+        Body: {action: 'archive' or 'unarchive'} (optional, defaults to toggle)
+        """
+        try:
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            # Get action from request body (optional)
+            action = request.data.get('action', 'toggle')
+            
+            if action == 'archive' or (action == 'toggle' and message.status != 'archived'):
+                # Archive message
+                MessageService.archive_message(message, request.user)
+                message_text = 'پیام به آرشیو منتقل شد'
+            elif action == 'unarchive' or (action == 'toggle' and message.status == 'archived'):
+                # Unarchive message
+                MessageService.unarchive_message(message, request.user)
+                message_text = 'پیام از آرشیو خارج شد'
+            else:
+                raise ValidationError('عملیات نامعتبر')
+            
+            # Reload message to get updated data
+            message = MessageService.get_message_by_id(
+                message_id=message_id,
+                user=request.user
+            )
+            
+            serializer = MessageDetailSerializer(message, context={'request': request})
+            
+            return Response({
+                'message': message_text,
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except ValidationError as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)

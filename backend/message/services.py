@@ -41,6 +41,11 @@ class MessageService:
             if MessageService.is_blocked(blocker=receiver, blocked=sender):
                 raise ValidationError('شما توسط این کاربر بلاک شده‌اید و نمی‌توانید پیام ارسال کنید')
         
+        # Check if sender is marked as spam by receiver
+        is_spam = False
+        if receiver:
+            is_spam = MessageService.is_spam_sender(blocker=receiver, blocked=sender)
+        
         # Create message
         message = Message.objects.create(
             sender=sender,
@@ -50,19 +55,21 @@ class MessageService:
             is_private=is_private,
             attachment=attachment,
             status='sent',
-            sent_at=timezone.now()
+            sent_at=timezone.now(),
+            is_spam=is_spam
         )
         
         return message
     
     @staticmethod
-    def get_user_messages(user, message_type='all'):
+    def get_user_messages(user, message_type='all', search_query=None):
         """
         Get all messages for a user (sent and received)
         
         Args:
             user: User object
             message_type: 'all', 'sent', 'received', 'inbox'
+            search_query: Optional search query string
         
         Returns:
             QuerySet of Message objects
@@ -74,10 +81,10 @@ class MessageService:
             # Only received messages
             messages = Message.objects.filter(receiver=user)
         elif message_type == 'inbox':
-            # Inbox: received private messages + public messages
+            # Inbox: received private messages + public messages (excluding spam and archived)
             messages = Message.objects.filter(
                 models.Q(receiver=user) | models.Q(is_private=False)
-            )
+            ).exclude(is_spam=True).exclude(status='archived')
         elif message_type == 'starred':
             # Only starred messages
             messages = Message.objects.filter(
@@ -90,6 +97,12 @@ class MessageService:
                 models.Q(sender=user) | models.Q(receiver=user) | models.Q(is_private=False),
                 is_spam=True
             )
+        elif message_type == 'archived':
+            # Only archived messages
+            messages = Message.objects.filter(
+                models.Q(sender=user) | models.Q(receiver=user) | models.Q(is_private=False),
+                status='archived'
+            )
         else:
             # All messages (sent and received)
             messages = Message.objects.filter(
@@ -98,6 +111,18 @@ class MessageService:
         
         # Exclude deleted messages
         messages = messages.exclude(status='deleted')
+        
+        # Apply search query if provided
+        if search_query and search_query.strip():
+            search_query = search_query.strip()
+            messages = messages.filter(
+                models.Q(subject__icontains=search_query) |
+                models.Q(body__icontains=search_query) |
+                models.Q(sender__email__icontains=search_query) |
+                models.Q(sender__username__icontains=search_query) |
+                models.Q(receiver__email__icontains=search_query) |
+                models.Q(receiver__username__icontains=search_query)
+            )
         
         return messages.order_by('-created_at')
     
@@ -225,4 +250,103 @@ class MessageService:
             block.delete()
         except Block.DoesNotExist:
             raise ValidationError('این کاربر بلاک نشده است')
+    
+    @staticmethod
+    def get_blocked_users(user):
+        """Get all users blocked by a user"""
+        blocks = Block.objects.filter(blocker=user).select_related('blocked')
+        return [block.blocked for block in blocks]
+    
+    @staticmethod
+    def mark_sender_as_spam(receiver, sender):
+        """
+        Mark a sender as spam for a receiver
+        This will:
+        1. Create/update Block with is_spam=True
+        2. Mark all existing messages from sender to receiver as spam
+        """
+        if receiver == sender:
+            raise ValidationError('شما نمی‌توانید خودتان را به عنوان اسپم علامت بزنید')
+        
+        # Create or update block with is_spam=True
+        block, created = Block.objects.get_or_create(
+            blocker=receiver,
+            blocked=sender,
+            defaults={'is_spam': True}
+        )
+        
+        if not created:
+            block.is_spam = True
+            block.save()
+        
+        # Mark all existing messages from sender to receiver as spam
+        Message.objects.filter(
+            sender=sender,
+            receiver=receiver
+        ).update(is_spam=True)
+        
+        return block
+    
+    @staticmethod
+    def unmark_sender_as_spam(receiver, sender):
+        """
+        Unmark a sender as spam for a receiver
+        This will:
+        1. Update Block with is_spam=False (or delete if only spam was set)
+        2. Unmark all existing messages from sender to receiver as spam
+        """
+        if receiver == sender:
+            raise ValidationError('شما نمی‌توانید خودتان را از اسپم خارج کنید')
+        
+        try:
+            block = Block.objects.get(blocker=receiver, blocked=sender)
+            # If block exists, set is_spam to False
+            # If block was only for spam, we can delete it, but let's keep it with is_spam=False
+            # in case user wants to block them later
+            block.is_spam = False
+            block.save()
+        except Block.DoesNotExist:
+            # If no block exists, nothing to do
+            pass
+        
+        # Unmark all existing messages from sender to receiver as spam
+        Message.objects.filter(
+            sender=sender,
+            receiver=receiver
+        ).update(is_spam=False)
+        
+        return True
+    
+    @staticmethod
+    def is_spam_sender(blocker, blocked):
+        """Check if a user is marked as spam by another user"""
+        try:
+            block = Block.objects.get(blocker=blocker, blocked=blocked)
+            return block.is_spam
+        except Block.DoesNotExist:
+            return False
+    
+    @staticmethod
+    def archive_message(message, user):
+        """Archive a message"""
+        if message.sender != user and message.receiver != user:
+            raise ValidationError('شما دسترسی به این پیام ندارید')
+        
+        message.status = 'archived'
+        message.save()
+        return message
+    
+    @staticmethod
+    def unarchive_message(message, user):
+        """Unarchive a message (restore to previous status)"""
+        if message.sender != user and message.receiver != user:
+            raise ValidationError('شما دسترسی به این پیام ندارید')
+        
+        # Restore to read if it was read, otherwise sent
+        if message.read_at:
+            message.status = 'read'
+        else:
+            message.status = 'sent'
+        message.save()
+        return message
 

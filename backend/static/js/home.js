@@ -35,6 +35,14 @@ function setupEventListeners() {
         e.preventDefault();
         await changePassword();
     });
+
+    document.getElementById('closeBlockedUsersBtn').addEventListener('click', closeBlockedUsersModal);
+    
+    document.getElementById('blockedUsersModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeBlockedUsersModal();
+        }
+    });
 }
 
 async function openProfileModal() {
@@ -103,7 +111,6 @@ function displayProfile(profileData) {
     const profileContent = document.getElementById('profileContent');
     
     const profileImage = profileData.profile_image_url || '';
-    const themeImage = profileData.theme_image_url || '';
     const name = profileData.name || profileData.full_name || '';
     
     profileContent.innerHTML = `
@@ -120,22 +127,93 @@ function displayProfile(profileData) {
                     </div>
                 </div>
 
-            <div class="compose-form-group">
-                <label for="profileName">نام</label>
-                <input type="text" id="profileName" name="name" value="${escapeHtml(name)}" placeholder="نام خود را وارد کنید">
-            </div>
-
-            <div class="compose-form-group">
-                <label for="themeImageInput" class="attachment-label">
-                    <span>🎨</span>
-                    <span>عکس تم (برای پس‌زمینه چت)</span>
-                </label>
-                <input type="file" id="themeImageInput" name="theme_image" accept="image/*">
-                ${themeImage ? `
-                    <div style="margin-top: 10px;">
-                        <img src="${themeImage}" alt="تم" style="max-width: 100%; max-height: 200px; border-radius: 10px; border: 1px solid #533483;">
+            <div class="compose-form-group" style="margin-bottom: 30px;">
+                <div class="username-input-container" style="background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 16px; padding: 24px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(83, 52, 131, 0.1); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden;">
+                    <!-- Glow effect background -->
+                    <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(142, 36, 170, 0.15) 0%, transparent 70%); opacity: 0; transition: opacity 0.5s ease; pointer-events: none;" class="username-glow-bg"></div>
+                    
+                    <!-- Label with icon -->
+                    <label for="profileName" style="display: flex; align-items: center; gap: 12px; margin-bottom: 18px; font-weight: 600; color: var(--arcane-white); font-size: 16px; position: relative; z-index: 1;">
+                        <span style="font-size: 22px; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; background: linear-gradient(135deg, rgba(83, 52, 131, 0.3), rgba(142, 36, 170, 0.3)); border: 1px solid rgba(83, 52, 131, 0.4); border-radius: 10px; backdrop-filter: blur(10px);">✏️</span>
+                        <span style="background: linear-gradient(135deg, var(--arcane-white), rgba(142, 36, 170, 0.8)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; letter-spacing: 0.5px;">نام کاربری</span>
+                    </label>
+                    
+                    <!-- Input field with glass effect -->
+                    <div style="position: relative; z-index: 1;">
+                        <span class="username-icon" style="position: absolute; right: 20px; top: 50%; transform: translateY(-50%); font-size: 22px; color: rgba(142, 36, 170, 0.6); pointer-events: none; z-index: 2; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);">👤</span>
+                        <input type="text" 
+                               id="profileName" 
+                               name="name" 
+                               value="${escapeHtml(name)}" 
+                               placeholder="نام خود را وارد کنید..."
+                               style="width: 100%; padding: 16px 20px; padding-right: 55px; background: rgba(26, 26, 46, 0.6); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid var(--glass-border); border-radius: 12px; color: var(--arcane-white); font-family: 'Vazirmatn', sans-serif; font-size: 15px; font-weight: 500; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); outline: none; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);">
                     </div>
-                ` : ''}
+                    
+                    <!-- Helper text -->
+                    <div style="margin-top: 14px; font-size: 12px; color: rgba(255, 255, 255, 0.5); display: flex; align-items: center; gap: 8px; position: relative; z-index: 1;">
+                        <span style="font-size: 14px; opacity: 0.7;">💡</span>
+                        <span>این نام در پیام‌های شما نمایش داده می‌شود</span>
+                    </div>
+                </div>
+                
+                <style>
+                    .username-input-container:hover {
+                        border-color: rgba(83, 52, 131, 0.5) !important;
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(83, 52, 131, 0.2), 0 0 20px rgba(142, 36, 170, 0.1) !important;
+                    }
+                    .username-input-container:hover .username-glow-bg {
+                        opacity: 0.5 !important;
+                    }
+                    
+                    #profileName:focus {
+                        border-color: var(--arcane-purple) !important;
+                        background: rgba(26, 26, 46, 0.8) !important;
+                        box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 0 3px rgba(83, 52, 131, 0.2), 0 4px 12px rgba(83, 52, 131, 0.3) !important;
+                        transform: translateY(-1px);
+                    }
+                    
+                    #profileName:hover:not(:focus) {
+                        border-color: rgba(83, 52, 131, 0.5) !important;
+                        background: rgba(26, 26, 46, 0.7) !important;
+                    }
+                    
+                    #profileName::placeholder {
+                        color: rgba(255, 255, 255, 0.35);
+                        font-weight: 400;
+                    }
+                    
+                    #profileName:focus ~ .username-icon,
+                    #profileName:focus + span.username-icon {
+                        color: var(--arcane-pink) !important;
+                        transform: translateY(-50%) scale(1.15) rotate(5deg);
+                    }
+                    
+                    .username-input-container:hover .username-icon {
+                        color: rgba(142, 36, 170, 0.8) !important;
+                    }
+                    
+                    .username-input-container:has(#profileName:focus) {
+                        border-color: var(--arcane-purple) !important;
+                        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(83, 52, 131, 0.3), 0 0 30px rgba(142, 36, 170, 0.2) !important;
+                    }
+                    
+                    .username-input-container:has(#profileName:focus) .username-glow-bg {
+                        opacity: 0.7 !important;
+                    }
+                    
+                    @keyframes subtlePulse {
+                        0%, 100% {
+                            opacity: 0.3;
+                        }
+                        50% {
+                            opacity: 0.6;
+                        }
+                    }
+                    
+                    .username-glow-bg {
+                        animation: subtlePulse 4s ease-in-out infinite;
+                    }
+                </style>
             </div>
 
             <div class="compose-actions">
@@ -156,6 +234,8 @@ function setupProfileForm() {
     const profileForm = document.getElementById('profileForm');
     const profileImageInput = document.getElementById('profileImageInput');
     const profileImagePreview = document.getElementById('profileImagePreview');
+    const profileNameInput = document.getElementById('profileName');
+    const usernameIcon = document.querySelector('.username-icon');
     
     profileImageInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
@@ -167,6 +247,22 @@ function setupProfileForm() {
             reader.readAsDataURL(file);
         }
     });
+    
+    if (profileNameInput && usernameIcon) {
+        profileNameInput.addEventListener('focus', function() {
+            if (usernameIcon) {
+                usernameIcon.style.color = '#8e24aa';
+                usernameIcon.style.transform = 'translateY(-50%) scale(1.2)';
+            }
+        });
+        
+        profileNameInput.addEventListener('blur', function() {
+            if (usernameIcon) {
+                usernameIcon.style.color = 'rgba(142, 36, 170, 0.8)';
+                usernameIcon.style.transform = 'translateY(-50%) scale(1)';
+            }
+        });
+    }
     
     profileForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -189,11 +285,6 @@ async function saveProfile() {
     const profileImage = document.getElementById('profileImageInput').files[0];
     if (profileImage) {
         formData.append('profile_image', profileImage);
-    }
-    
-    const themeImage = document.getElementById('themeImageInput').files[0];
-    if (themeImage) {
-        formData.append('theme_image', themeImage);
     }
     
     saveBtn.disabled = true;
@@ -358,5 +449,160 @@ function logout() {
     localStorage.removeItem('remember_me');
     showLoading('در حال انتقال');
     window.location.href = '/';
+}
+
+async function openBlockedUsersModal() {
+    const modal = document.getElementById('blockedUsersModal');
+    const content = document.getElementById('blockedUsersContent');
+    
+    modal.classList.add('show');
+    content.innerHTML = `
+        <div class="loading-spinner" id="blockedUsersLoading">
+            <div class="spinner"></div>
+            <p>در حال بارگذاری...</p>
+        </div>
+    `;
+    
+    await loadBlockedUsers();
+}
+
+function closeBlockedUsersModal() {
+    const modal = document.getElementById('blockedUsersModal');
+    modal.classList.remove('show');
+}
+
+async function loadBlockedUsers() {
+    const token = localStorage.getItem('access_token');
+    const content = document.getElementById('blockedUsersContent');
+    
+    if (!token) {
+        showLoading('در حال انتقال');
+        window.location.href = '/';
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/message/blocked/', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            showLoading('در حال انتقال');
+            window.location.href = '/';
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok && data.data) {
+            displayBlockedUsers(data.data);
+        } else {
+            content.innerHTML = `
+                <div class="error-message" style="display: block;">
+                    ${data.error || 'خطا در دریافت لیست کاربران بلاک شده'}
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        content.innerHTML = `
+            <div class="error-message" style="display: block;">
+                خطا در ارتباط با سرور
+            </div>
+        `;
+    }
+}
+
+function displayBlockedUsers(blockedUsers) {
+    const content = document.getElementById('blockedUsersContent');
+    
+    if (blockedUsers.length === 0) {
+        content.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <div class="empty-state-text">هیچ کاربری بلاک نشده است</div>
+            </div>
+        `;
+        return;
+    }
+    
+    const usersHTML = blockedUsers.map(user => {
+        const avatar = user.profile_image 
+            ? `<img src="${user.profile_image}" alt="${user.name || user.username}" style="width: 100%; height: 100%; object-fit: cover;">`
+            : `<span>${(user.name || user.username || user.email).charAt(0).toUpperCase()}</span>`;
+        
+        const spamBadge = user.is_spam ? '<span style="padding: 4px 8px; background: rgba(220, 53, 69, 0.3); border-radius: 5px; font-size: 12px; margin-right: 8px;">🚫 اسپم</span>' : '';
+        
+        return `
+            <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: rgba(42, 42, 62, 0.4); border-radius: 10px; margin-bottom: 15px; border: 1px solid var(--glass-border);">
+                <div class="message-avatar" style="width: 50px; height: 50px; font-size: 20px;">
+                    ${avatar}
+                </div>
+                <div style="flex-grow: 1;">
+                    <div style="font-size: 16px; font-weight: 600; color: var(--arcane-white); margin-bottom: 5px;">
+                        ${escapeHtml(user.name || user.username || '')}
+                        ${spamBadge}
+                    </div>
+                    <div style="color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+                        ${escapeHtml(user.email)}
+                    </div>
+                </div>
+                <button onclick="unblockUser('${escapeHtml(user.email)}')" style="padding: 10px 20px; background: rgba(40, 167, 69, 0.6); border: 1px solid #28a745; border-radius: 8px; color: var(--arcane-white); cursor: pointer; font-family: 'Vazirmatn', sans-serif; font-size: 14px; white-space: nowrap;">
+                    ✅ خروج از بلاک
+                </button>
+            </div>
+        `;
+    }).join('');
+    
+    content.innerHTML = `
+        <div style="max-height: 500px; overflow-y: auto;">
+            ${usersHTML}
+        </div>
+    `;
+}
+
+async function unblockUser(email) {
+    const token = localStorage.getItem('access_token');
+    
+    if (!token) {
+        window.location.href = '/';
+        return;
+    }
+    
+    if (!confirm(`آیا مطمئن هستید که می‌خواهید ${email} را از بلاک خارج کنید؟`)) {
+        return;
+    }
+    
+    try {
+        showLoading('در حال خروج از بلاک');
+        const response = await fetch('/api/message/unblock/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: email })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showSuccessMessage('کاربر با موفقیت از بلاک خارج شد');
+            await loadBlockedUsers();
+        } else {
+            alert(data.error || 'خطا در خروج از بلاک');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('خطا در ارتباط با سرور');
+    } finally {
+        hideLoading();
+    }
 }
 

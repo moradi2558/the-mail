@@ -242,6 +242,8 @@ class MessageDetailSerializer(serializers.ModelSerializer):
             'is_starred',
             'is_important',
             'is_spam',
+            'is_sender_spam',
+            'is_sender_blocked',
             'has_attachment',
             'attachment_size',
             'attachment_name',
@@ -307,9 +309,51 @@ class MessageDetailSerializer(serializers.ModelSerializer):
             if request:
                 return request.build_absolute_uri(obj.receiver.profile.profile_image.url)
         return None
+    
+    is_sender_spam = serializers.SerializerMethodField()
+    is_sender_blocked = serializers.SerializerMethodField()
+    
+    def get_is_sender_spam(self, obj):
+        """Check if sender is marked as spam by receiver"""
+        if obj.receiver:
+            from .services import MessageService
+            return MessageService.is_spam_sender(blocker=obj.receiver, blocked=obj.sender)
+        return False
+    
+    def get_is_sender_blocked(self, obj):
+        """Check if sender is blocked by receiver"""
+        if obj.receiver:
+            from .services import MessageService
+            return MessageService.is_blocked(blocker=obj.receiver, blocked=obj.sender)
+        return False
 
 
 class BlockUserSerializer(serializers.Serializer):
     """Serializer for blocking/unblocking a user"""
     email = serializers.EmailField(required=True, label='ایمیل کاربر')
     is_spam = serializers.BooleanField(default=False, required=False, label='اسپم')
+
+
+class BlockedUserSerializer(serializers.Serializer):
+    """Serializer for blocked users list"""
+    id = serializers.IntegerField(read_only=True)
+    email = serializers.EmailField(read_only=True)
+    username = serializers.CharField(read_only=True)
+    name = serializers.SerializerMethodField()
+    profile_image = serializers.SerializerMethodField()
+    is_spam = serializers.BooleanField(read_only=True)
+    blocked_at = serializers.DateTimeField(read_only=True)
+    
+    def get_name(self, obj):
+        """Get blocked user's name"""
+        if hasattr(obj, 'profile'):
+            return obj.profile.get_full_name()
+        return obj.username
+    
+    def get_profile_image(self, obj):
+        """Get blocked user's profile image URL"""
+        if hasattr(obj, 'profile') and obj.profile.profile_image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile.profile_image.url)
+        return None
