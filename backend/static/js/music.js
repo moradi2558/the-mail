@@ -2,12 +2,80 @@ const API_BASE_URL = '/api/music';
 let currentView = 'playlists';
 let currentPlaylistId = null;
 
+// Music Player State
+let audioPlayer = null;
+let currentSong = null;
+let currentSongIndex = -1;
+let queue = [];
+let isPlaying = false;
+let isShuffled = false;
+let repeatMode = 'off'; // 'off', 'one', 'all'
+let volume = 100;
+let isMuted = false;
+let originalQueue = [];
+
 document.addEventListener('DOMContentLoaded', function() {
     checkAuth();
     setupEventListeners();
+    setupMusicPlayer();
     loadPlaylists();
     loadInvitations();
+    // Load last playback state after a short delay
+    setTimeout(loadPlaybackState, 1000);
 });
+
+function setupMusicPlayer() {
+    audioPlayer = document.getElementById('audioPlayer');
+    if (!audioPlayer) return;
+    
+    // Load volume from localStorage
+    const savedVolume = localStorage.getItem('musicVolume');
+    if (savedVolume) {
+        volume = parseInt(savedVolume);
+        audioPlayer.volume = volume / 100;
+        document.getElementById('volumeSlider').value = volume;
+    }
+    
+    // Audio event listeners
+    audioPlayer.addEventListener('loadedmetadata', function() {
+        updateTotalTime();
+    });
+    
+    audioPlayer.addEventListener('timeupdate', function() {
+        updateProgress();
+        // Save playback state periodically when playing
+        if (currentSong && isPlaying && audioPlayer.currentTime > 0) {
+            const currentTime = Math.floor(audioPlayer.currentTime);
+            // Save every 5 seconds
+            if (currentTime % 5 === 0 && currentTime > 0) {
+                savePlaybackState(currentSong.id, audioPlayer.currentTime);
+            }
+        }
+    });
+    
+    audioPlayer.addEventListener('ended', function() {
+        handleSongEnd();
+    });
+    
+    audioPlayer.addEventListener('play', function() {
+        isPlaying = true;
+        updatePlayPauseButton();
+    });
+    
+    audioPlayer.addEventListener('pause', function() {
+        isPlaying = false;
+        updatePlayPauseButton();
+        // Save playback state when paused
+        if (currentSong) {
+            savePlaybackState(currentSong.id, audioPlayer.currentTime);
+        }
+    });
+    
+    audioPlayer.addEventListener('error', function(e) {
+        console.error('Audio error:', e);
+        showToast('خطا در پخش موزیک', 'error');
+    });
+}
 
 function checkAuth() {
     const token = localStorage.getItem('access_token');
@@ -225,21 +293,27 @@ async function viewPlaylist(playlistId) {
                     </div>
                 `;
             } else {
-                container.innerHTML = playlist.songs.map(song => `
-                    <div class="song-item" data-song-id="${song.id}">
-                        <div class="song-icon">🎵</div>
-                        <div class="song-info">
-                            <div class="song-title">${song.title}</div>
-                            <div class="song-details">
-                                ${song.artist || 'خواننده نامشخص'} • ${song.album || 'آلبوم نامشخص'} • 
-                                اضافه شده توسط: ${song.added_by_username}
+                // Store playlist songs for queue
+                window.currentPlaylistSongs = playlist.songs;
+                
+                container.innerHTML = playlist.songs.map((song, index) => {
+                    const isCurrentSong = currentSong && currentSong.id === song.id;
+                    return `
+                        <div class="song-item ${isCurrentSong ? 'playing' : ''}" data-song-id="${song.id}" onclick="playSongFromPlaylist(${song.id}, ${index})">
+                            <div class="song-icon">${isCurrentSong && isPlaying ? '▶' : '🎵'}</div>
+                            <div class="song-info">
+                                <div class="song-title">${song.title}</div>
+                                <div class="song-details">
+                                    ${song.artist || 'خواننده نامشخص'} • ${song.album || 'آلبوم نامشخص'} • 
+                                    اضافه شده توسط: ${song.added_by_username}
+                                </div>
+                            </div>
+                            <div class="song-actions">
+                                ${canEdit ? `<button class="action-btn" onclick="event.stopPropagation(); removeSongFromPlaylist(${song.id})">حذف</button>` : ''}
                             </div>
                         </div>
-                        <div class="song-actions">
-                            ${canEdit ? `<button class="action-btn" onclick="removeSongFromPlaylist(${song.id})">حذف</button>` : ''}
-                        </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
             }
         } else {
             container.innerHTML = `<div class="empty-state"><p>خطا: ${data.error || 'خطا در بارگذاری'}</p></div>`;
@@ -280,16 +354,20 @@ async function loadSongs() {
                     </div>
                 `;
             } else {
-                container.innerHTML = data.data.map(song => {
+                // Store songs for queue
+                const songs = data.data;
+                
+                container.innerHTML = songs.map((song, index) => {
                     const isSelected = selectedSongIds.has(song.id);
                     const privacyIcon = song.is_public ? '🌐' : '🔒';
                     const privacyTitle = song.is_public ? 'عمومی' : 'خصوصی';
+                    const isCurrentSong = currentSong && currentSong.id === song.id;
                     
                     return `
-                        <div class="song-item" data-song-id="${song.id}">
-                            <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" ${isSelected ? 'checked' : ''} onchange="toggleSongSelection(${song.id})">
+                        <div class="song-item ${isCurrentSong ? 'playing' : ''}" data-song-id="${song.id}" onclick="playSongFromList(${song.id}, ${index})">
+                            <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" ${isSelected ? 'checked' : ''} onchange="event.stopPropagation(); toggleSongSelection(${song.id})">
                             <div class="song-privacy-icon" title="${privacyTitle}">${privacyIcon}</div>
-                            <div class="song-icon">🎵</div>
+                            <div class="song-icon">${isCurrentSong && isPlaying ? '▶' : '🎵'}</div>
                             <div class="song-info">
                                 <div class="song-title">${song.title}</div>
                                 <div class="song-details">
@@ -298,11 +376,14 @@ async function loadSongs() {
                                 </div>
                             </div>
                             <div class="song-actions">
-                                <button class="action-btn" onclick="addSongToCurrentPlaylist(${song.id})">افزودن به پلی‌لیست</button>
+                                <button class="action-btn" onclick="event.stopPropagation(); addSongToCurrentPlaylist(${song.id})">افزودن به پلی‌لیست</button>
                             </div>
                         </div>
                     `;
                 }).join('');
+                
+                // Store songs in a way we can access them
+                window.currentSongsList = songs;
                 
                 updateSelectedCount();
             }

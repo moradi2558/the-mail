@@ -10,6 +10,7 @@ class SongSerializer(serializers.ModelSerializer):
     file_url = serializers.SerializerMethodField()
     file_size_mb = serializers.SerializerMethodField()
     file_name = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
     
     class Meta:
         model = Song
@@ -25,6 +26,7 @@ class SongSerializer(serializers.ModelSerializer):
             'uploaded_by_username',
             'uploaded_by_email',
             'is_public',
+            'is_favorite',
             'duration',
             'file_size',
             'file_size_mb',
@@ -50,6 +52,19 @@ class SongSerializer(serializers.ModelSerializer):
         if obj.file:
             return os.path.basename(obj.file.name)
         return None
+    
+    def get_is_favorite(self, obj):
+        """Check if song is favorited by current user (in favorites playlist)"""
+        request = self.context.get('request')
+        if request and request.user and request.user.is_authenticated:
+            from .models import Playlist
+            favorites_playlist = Playlist.objects.filter(
+                owner=request.user,
+                name='علاقه‌مندی‌ها'
+            ).first()
+            if favorites_playlist:
+                return favorites_playlist.songs.filter(id=obj.id).exists()
+        return False
 
 
 class SongCreateSerializer(serializers.ModelSerializer):

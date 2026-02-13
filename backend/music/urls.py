@@ -4,7 +4,8 @@ from .views import (
     PlaylistListView, PlaylistDetailView, CreatePlaylistView, UpdatePlaylistView,
     AddSongToPlaylistView, RemoveSongFromPlaylistView,
     InviteToPlaylistView, InvitationsListView, RespondToInvitationView,
-    UpdateSongsPublicStatusView
+    UpdateSongsPublicStatusView, ToggleFavoriteSongView, FavoriteSongsListView,
+    SavePlaybackStateView, GetPlaybackStateView
 )
 
 app_name = 'music'
@@ -14,7 +15,11 @@ urlpatterns = [
     path('upload/', UploadSongView.as_view(), name='upload'),
     path('upload-multiple/', UploadMultipleSongsView.as_view(), name='upload-multiple'),
     path('songs/', SongListView.as_view(), name='songs'),
+    path('songs/<int:song_id>/toggle-favorite/', ToggleFavoriteSongView.as_view(), name='toggle-favorite'),
     path('songs/update-public-status/', UpdateSongsPublicStatusView.as_view(), name='update-songs-public-status'),
+    path('favorites/', FavoriteSongsListView.as_view(), name='favorites'),
+    path('playback-state/', GetPlaybackStateView.as_view(), name='get-playback-state'),
+    path('playback-state/save/', SavePlaybackStateView.as_view(), name='save-playback-state'),
     
     # Playlist endpoints
     path('playlists/', PlaylistListView.as_view(), name='playlists'),

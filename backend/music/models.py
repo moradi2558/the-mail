@@ -153,3 +153,64 @@ class PlaylistInvitation(models.Model):
     
     def __str__(self):
         return f"{self.playlist.name} - {self.invitee_email} - {self.status}"
+
+
+class UserPlaybackState(models.Model):
+    """Model for storing user's last played song and position"""
+    
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='playback_state',
+        verbose_name='کاربر'
+    )
+    last_song = models.ForeignKey(
+        Song,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='playback_states',
+        verbose_name='آخرین آهنگ پخش شده'
+    )
+    last_position = models.FloatField(default=0.0, verbose_name='آخرین موقعیت (ثانیه)')
+    last_played_at = models.DateTimeField(auto_now=True, verbose_name='زمان آخرین پخش')
+    
+    class Meta:
+        verbose_name = 'وضعیت پخش کاربر'
+        verbose_name_plural = 'وضعیت‌های پخش کاربران'
+        indexes = [
+            models.Index(fields=['user', '-last_played_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.last_song.title if self.last_song else 'None'} - {self.last_position:.1f}s"
+
+
+class FavoriteSong(models.Model):
+    """Favorite songs model for users"""
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorite_songs',
+        verbose_name='کاربر'
+    )
+    song = models.ForeignKey(
+        Song,
+        on_delete=models.CASCADE,
+        related_name='favorited_by',
+        verbose_name='آهنگ'
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='زمان ایجاد')
+    
+    class Meta:
+        unique_together = ('user', 'song')
+        ordering = ['-created_at']
+        verbose_name = 'آهنگ مورد علاقه'
+        verbose_name_plural = 'آهنگ‌های مورد علاقه'
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username} - {self.song.title}"

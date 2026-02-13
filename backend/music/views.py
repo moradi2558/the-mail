@@ -11,7 +11,7 @@ from .serializers import (
     PlaylistInvitationSerializer, PlaylistInvitationCreateSerializer
 )
 from .services import MusicService
-from .models import Song, Playlist, PlaylistInvitation
+from .models import Song, Playlist, PlaylistInvitation, UserPlaybackState
 
 
 class UploadSongView(APIView):
@@ -587,6 +587,204 @@ class UpdateSongsPublicStatusView(APIView):
                 'message': f'{updated_count} آهنگ با موفقیت به‌روزرسانی شد',
                 'count': updated_count,
                 'is_public': bool(is_public)
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ToggleFavoriteSongView(APIView):
+    """
+    API View for toggling favorite status of a song
+    POST /api/music/songs/<id>/toggle-favorite/
+    Uses a playlist named "علاقه‌مندی‌ها" for favorites
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, FormParser]
+    
+    def post(self, request, song_id):
+        """
+        Toggle favorite status of a song
+        Creates or uses a playlist named "علاقه‌مندی‌ها"
+        """
+        try:
+            song = Song.objects.get(id=song_id)
+            
+            # Get or create favorites playlist
+            favorites_playlist, created = Playlist.objects.get_or_create(
+                owner=request.user,
+                name='علاقه‌مندی‌ها',
+                defaults={'name': 'علاقه‌مندی‌ها'}
+            )
+            
+            # Check if song is already in favorites
+            is_favorite = favorites_playlist.songs.filter(id=song.id).exists()
+            
+            if is_favorite:
+                # Remove from favorites
+                favorites_playlist.songs.remove(song)
+                is_favorite = False
+                message = 'آهنگ از علاقه‌مندی‌ها حذف شد'
+            else:
+                # Add to favorites
+                favorites_playlist.songs.add(song)
+                is_favorite = True
+                message = 'آهنگ به علاقه‌مندی‌ها اضافه شد'
+            
+            return Response({
+                'message': message,
+                'is_favorite': is_favorite
+            }, status=status.HTTP_200_OK)
+        
+        except Song.DoesNotExist:
+            return Response({
+                'error': 'آهنگ یافت نشد'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FavoriteSongsListView(APIView):
+    """
+    API View for listing user's favorite songs
+    GET /api/music/favorites/
+    Returns songs from "علاقه‌مندی‌ها" playlist
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get all favorite songs for authenticated user from favorites playlist
+        """
+        try:
+            # Get favorites playlist
+            favorites_playlist = Playlist.objects.filter(
+                owner=request.user,
+                name='علاقه‌مندی‌ها'
+            ).first()
+            
+            if not favorites_playlist:
+                # Return empty list if playlist doesn't exist
+                return Response({
+                    'message': 'لیست علاقه‌مندی‌ها خالی است',
+                    'count': 0,
+                    'data': []
+                }, status=status.HTTP_200_OK)
+            
+            songs = favorites_playlist.songs.all()
+            serializer = SongSerializer(songs, many=True, context={'request': request})
+            
+            return Response({
+                'message': 'لیست آهنگ‌های مورد علاقه با موفقیت دریافت شد',
+                'count': songs.count(),
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SavePlaybackStateView(APIView):
+    """
+    API View for saving user's playback state
+    POST /api/music/playback-state/save/
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser, FormParser]
+    
+    def post(self, request):
+        """
+        Save playback state (song and position)
+        Body: {
+            song_id: integer (required),
+            position: float (required) - position in seconds
+        }
+        """
+        song_id = request.data.get('song_id')
+        position = request.data.get('position', 0.0)
+        
+        if not song_id:
+            return Response({
+                'error': 'شناسه آهنگ الزامی است'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            song = Song.objects.get(id=song_id)
+            
+            # Get or create playback state
+            playback_state, created = UserPlaybackState.objects.get_or_create(
+                user=request.user,
+                defaults={'last_song': song, 'last_position': float(position)}
+            )
+            
+            if not created:
+                playback_state.last_song = song
+                playback_state.last_position = float(position)
+                playback_state.save()
+            
+            return Response({
+                'message': 'وضعیت پخش ذخیره شد',
+                'data': {
+                    'song_id': song.id,
+                    'position': playback_state.last_position
+                }
+            }, status=status.HTTP_200_OK)
+        
+        except Song.DoesNotExist:
+            return Response({
+                'error': 'آهنگ یافت نشد'
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetPlaybackStateView(APIView):
+    """
+    API View for getting user's playback state
+    GET /api/music/playback-state/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get user's last playback state
+        """
+        try:
+            playback_state = UserPlaybackState.objects.filter(
+                user=request.user
+            ).select_related('last_song').first()
+            
+            if not playback_state or not playback_state.last_song:
+                return Response({
+                    'message': 'وضعیت پخشی یافت نشد',
+                    'data': None
+                }, status=status.HTTP_200_OK)
+            
+            # Check if user has access to the song
+            song = playback_state.last_song
+            if song.uploaded_by != request.user and not song.is_public:
+                return Response({
+                    'message': 'دسترسی به آهنگ قبلی وجود ندارد',
+                    'data': None
+                }, status=status.HTTP_200_OK)
+            
+            serializer = SongSerializer(song, context={'request': request})
+            
+            return Response({
+                'message': 'وضعیت پخش با موفقیت دریافت شد',
+                'data': {
+                    'song': serializer.data,
+                    'position': playback_state.last_position,
+                    'last_played_at': playback_state.last_played_at
+                }
             }, status=status.HTTP_200_OK)
         
         except Exception as e:
