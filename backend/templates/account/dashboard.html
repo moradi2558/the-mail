@@ -1,0 +1,258 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mail - داشبورد</title>
+    <link rel="stylesheet" href="{% static 'css/inbox.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .dashboard-container {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 40px 20px;
+        }
+
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .dashboard-title {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #ffffff, #8e24aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 15px;
+        }
+
+        .dashboard-subtitle {
+            font-size: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 400;
+        }
+
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .service-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 40px 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(83, 52, 131, 0.2), rgba(142, 36, 170, 0.2));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .service-card:hover {
+            transform: translateY(-10px);
+            border-color: var(--arcane-pink);
+            box-shadow: 0 12px 40px rgba(142, 36, 170, 0.4);
+        }
+
+        .service-card:hover::before {
+            opacity: 1;
+        }
+
+        .service-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            display: block;
+            transition: transform 0.3s ease;
+        }
+
+        .service-card:hover .service-icon {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .service-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--arcane-white);
+            margin-bottom: 15px;
+        }
+
+        .service-description {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.7);
+            line-height: 1.6;
+            margin-bottom: 25px;
+        }
+
+        .service-btn {
+            padding: 12px 30px;
+            background: linear-gradient(135deg, var(--arcane-purple), var(--arcane-pink));
+            border: none;
+            border-radius: 10px;
+            color: var(--arcane-white);
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .service-btn:hover {
+            background: linear-gradient(135deg, var(--arcane-pink), var(--arcane-purple));
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(142, 36, 170, 0.5);
+        }
+
+        .dashboard-nav {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            color: var(--arcane-white);
+            font-family: 'Vazirmatn', sans-serif;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-btn:hover {
+            background: rgba(142, 36, 170, 0.3);
+            border-color: var(--arcane-pink);
+        }
+
+        @media (max-width: 768px) {
+            .dashboard-title {
+                font-size: 36px;
+            }
+
+            .services-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .service-card {
+                padding: 30px 20px;
+            }
+
+            .dashboard-nav {
+                top: 10px;
+                left: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="background-container">
+        <div class="forest-background"></div>
+    </div>
+
+    <div class="dashboard-container">
+        <div class="dashboard-nav">
+            <button class="nav-btn" onclick="logout()" title="خروج">
+                <span>⏻</span> خروج
+            </button>
+        </div>
+
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">به D-Mail خوش آمدید!</h1>
+            <p class="dashboard-subtitle">سرویس مورد نظر خود را انتخاب کنید</p>
+        </div>
+
+        <div class="services-grid">
+            <div class="service-card" onclick="navigateToService('/inbox/')">
+                <span class="service-icon">📧</span>
+                <h2 class="service-title">صندوق ایمیل</h2>
+                <p class="service-description">
+                    مدیریت پیام‌های خود، ارسال و دریافت ایمیل، سازماندهی پیام‌ها و دسترسی به تمام قابلیت‌های سیستم پیام‌رسانی
+                </p>
+                <a href="/inbox/" class="service-btn" onclick="showLoading('در حال انتقال'); event.stopPropagation();">
+                    ورود به صندوق ورودی
+                </a>
+            </div>
+
+            <div class="service-card" onclick="navigateToService('/music/')">
+                <span class="service-icon">🎵</span>
+                <h2 class="service-title">موزیک پلیر</h2>
+                <p class="service-description">
+                    آپلود و مدیریت موزیک‌های خود، ساخت پلی‌لیست، جستجو در آهنگ‌ها و به اشتراک‌گذاری موزیک با دیگران
+                </p>
+                <a href="/music/" class="service-btn" onclick="showLoading('در حال انتقال'); event.stopPropagation();">
+                    ورود به موزیک پلیر
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'js/loading.js' %}?v=3"></script>
+    <script>
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showLoading('در حال انتقال');
+                window.location.href = '/';
+                return;
+            }
+        }
+
+        function navigateToService(url) {
+            showLoading('در حال انتقال');
+            window.location.href = url;
+        }
+
+        function logout() {
+            if (confirm('آیا مطمئن هستید که می‌خواهید خارج شوید؟')) {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                showLoading('در حال خروج...');
+                window.location.href = '/';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+        });
+    </script>
+</body>
+</html>
+

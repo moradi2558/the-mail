@@ -9,6 +9,13 @@ class AuthView(TemplateView):
         return render(request, self.template_name)
 
 
+class DashboardView(TemplateView):
+    template_name = 'account/dashboard.html'
+    
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name)
+
+
 class HomeView(TemplateView):
     template_name = 'account/home.html'
     
@@ -28,3 +35,10 @@ class MessageDetailView(TemplateView):
     
     def get(self, request, message_id, *args, **kwargs):
         return render(request, self.template_name, {'message_id': message_id})
+
+
+class MusicView(TemplateView):
+    template_name = 'account/music.html'
+    
+    def get(self, request, *args, **kwargs):
+        return render(request, self.template_name)

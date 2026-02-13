@@ -1,0 +1,80 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Mail - موزیک پلیر</title>
+    <link rel="stylesheet" href="{% static 'css/inbox.css' %}">
+    <link rel="stylesheet" href="{% static 'css/loading.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-container">
+        <div class="forest-background"></div>
+    </div>
+
+    <div class="inbox-container">
+        <header class="inbox-header">
+            <div class="header-left">
+                <h1 class="logo">D-Mail</h1>
+            </div>
+            <div class="header-right">
+                <a href="/dashboard/" class="compose-btn" style="text-decoration: none; color: inherit;" onclick="showLoading('در حال انتقال');">
+                    <span>🏠</span>
+                    <span>داشبورد</span>
+                </a>
+                <div class="user-menu">
+                    <button class="user-btn logout-btn" id="logoutBtn" onclick="logout()" title="خروج">
+                        <span style="font-size: 18px;">⏻</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <div class="inbox-content">
+            <main class="messages-area" style="justify-content: center; align-items: center;">
+                <div style="text-align: center; padding: 50px 20px;">
+                    <h1 style="font-size: 48px; margin-bottom: 20px; background: linear-gradient(135deg, #ffffff, #8e24aa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                        🎵 موزیک پلیر
+                    </h1>
+                    <p style="font-size: 20px; color: #ffffff; margin-bottom: 30px;">
+                        بخش موزیک پلیر به زودی راه‌اندازی می‌شود
+                    </p>
+                    <a href="/dashboard/" style="padding: 15px 40px; background: linear-gradient(135deg, #533483, #8e24aa); border: none; border-radius: 10px; color: #ffffff; font-family: 'Vazirmatn', sans-serif; font-size: 16px; font-weight: 600; text-decoration: none; display: inline-block; margin: 10px;">
+                        بازگشت به داشبورد
+                    </a>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="{% static 'js/loading.js' %}?v=3"></script>
+    <script>
+        function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                showLoading('در حال انتقال');
+                window.location.href = '/';
+                return;
+            }
+        }
+
+        function logout() {
+            if (confirm('آیا مطمئن هستید که می‌خواهید خارج شوید؟')) {
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('refresh_token');
+                showLoading('در حال خروج...');
+                window.location.href = '/';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+        });
+    </script>
+</body>
+</html>
+

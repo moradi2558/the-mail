@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function redirectToHome() {
-        window.location.href = '/inbox/';
+        window.location.href = '/dashboard/';
     }
 
     loginFormElement.addEventListener('submit', async function(e) {
